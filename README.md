@@ -1,4 +1,4 @@
-<img src="./assets/web-ui.png" alt="Bykilt - Browser Use Web UI" width="full"/>
+<img src="./assets/bykilt.png" alt="Bykilt - Browser Use Web UI" width="full"/>
 
 <br/>
 
