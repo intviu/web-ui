@@ -17,7 +17,7 @@ def test_linkedin_search(request) -> None:
         )
         page = context.new_page()
 
-        # LinkedIn検索処理
+        ## Example 01 - LinkedIn検索処理
         page.goto("https://jp.linkedin.com/in/nobukins")
         page.get_by_role("button", name="閉じる").click()
         page.get_by_role("link", name="求人").click()
@@ -25,6 +25,18 @@ def test_linkedin_search(request) -> None:
         page.get_by_role("combobox", name="役職または会社を検索").fill(query)
         page.get_by_role("combobox", name="役職または会社を検索").press("Enter")
         page.get_by_role("option", name="人工知能 (AI)").click()
+
+        ## Example 02 - Beatport検索とTop10の連続再生
+        # page.goto("https://www.beatport.com/")
+        # page.get_by_role("button", name="I Accept").click()
+        # page.get_by_test_id("header-search-input").click()
+        # page.get_by_test_id("header-search-input").fill(query)
+        # page.goto("https://www.beatport.com/genre/minimal-deep-tech/14")
+        # page.locator(".CollectionControls-style__Controls-sc-3a6a5b4a-0 > .Play-style__Control-sc-bdba3bac-0").first.click()
+
+        # Listen for music 10sec!
+        page.wait_for_timeout(10000)
+
         expect(page).to_have_title(re.compile(query, re.IGNORECASE))
 
         # 録画を保存

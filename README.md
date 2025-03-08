@@ -63,6 +63,7 @@ source .venv/bin/activate
 Install Python packages:
 ```bash
 uv pip install -r requirements.txt
+uv pip install requests pyyaml pytest pytest-playwright 
 ```
 
 Install Playwright:

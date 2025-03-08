@@ -73,7 +73,7 @@ async def test_browser_use_org():
         )
     ) as browser_context:
         agent = Agent(
-            task="go to google.com and type 'OpenAI' click search and give me the first url",
+            task="search-linkedin query=Personal_AI_Assistant",
             llm=llm,
             browser_context=browser_context,
             use_vision=use_vision,
