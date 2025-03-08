@@ -528,7 +528,7 @@ def create_ui(config, theme_name="Ocean"):
 
     with gr.Blocks(title="Bykilt", theme=theme_map[theme_name], css=css) as demo:
         with gr.Row():
-            gr.Markdown("# 🌐 Bykilt\n### Enhanced Browser Control with AI and human, because for you", elem_classes=["header-text"])
+            gr.Markdown("# 🪄🌐 Bykilt\n### Enhanced Browser Control with AI and human, because for you", elem_classes=["header-text"])
 
         with gr.Tabs() as tabs:
             with gr.TabItem("⚙️ Agent Settings", id=1):
