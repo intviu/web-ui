@@ -1,4 +1,4 @@
-<img src="./assets/web-ui.png" alt="Browser Use Web UI" width="full"/>
+<img src="./assets/web-ui.png" alt="Bykilt - Browser Use Web UI" width="full"/>
 
 <br/>
 
@@ -33,8 +33,8 @@ Read the [quickstart guide](https://docs.browser-use.com/quickstart#prepare-the-
 
 #### Step 1: Clone the Repository
 ```bash
-git clone https://github.com/browser-use/web-ui.git
-cd web-ui
+git clone https://github.com/Nobukins/bykilt.git
+cd bykilt
 ```
 
 #### Step 2: Set Up Python Environment
@@ -82,47 +82,18 @@ cp .env.example .env
 ```
 2. Open `.env` in your preferred text editor and add your API keys and other settings
 
-### Option 2: Docker Installation
-
-#### Prerequisites
-- Docker and Docker Compose installed
-  - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (For Windows/macOS)
-  - [Docker Engine](https://docs.docker.com/engine/install/) and [Docker Compose](https://docs.docker.com/compose/install/) (For Linux)
-
-#### Installation Steps
-1. Clone the repository:
-```bash
-git clone https://github.com/browser-use/web-ui.git
-cd web-ui
-```
-
-2. Create and configure environment file:
+#### Step 5: Prepare template script
+1. Create a copy of the example template file:
 - Windows (Command Prompt):
 ```bash
-copy .env.example .env
+copy ./example/* ./tmp/myscript/*
 ```
 - macOS/Linux/Windows (PowerShell):
 ```bash
-cp .env.example .env
+mkdir ./tmp && mkdir ./tmp/myscript
+cp ./example/* ./tmp/myscript/
 ```
-Edit `.env` with your preferred text editor and add your API keys
-
-3. Run with Docker:
-```bash
-# Build and start the container with default settings (browser closes after AI tasks)
-docker compose up --build
-```
-```bash
-# Or run with persistent browser (browser stays open between AI tasks)
-CHROME_PERSISTENT_SESSION=true docker compose up --build
-```
-
-
-4. Access the Application:
-- Web Interface: Open `http://localhost:7788` in your browser
-- VNC Viewer (for watching browser interactions): Open `http://localhost:6080/vnc.html`
-  - Default VNC password: "youvncpassword"
-  - Can be changed by setting `VNC_PASSWORD` in your `.env` file
+2. Open `./tmp/myscript/search_script.py` in your preferred text editor and update pytest based script with your automation script.
 
 ## Usage
 
@@ -130,7 +101,7 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 1.  **Run the WebUI:**
     After completing the installation steps above, start the application:
     ```bash
-    python webui.py --ip 127.0.0.1 --port 7788
+    python bykilt.py --ip 127.0.0.1 --port 7788
     ```
 2. WebUI options:
    - `--ip`: The IP address to bind the WebUI to. Default is `127.0.0.1`.
@@ -164,64 +135,9 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 5. **Keep Browser Open(Optional):**
     - Set `CHROME_PERSISTENT_SESSION=true` in the `.env` file.
 
-### Docker Setup
-1. **Environment Variables:**
-   - All configuration is done through the `.env` file
-   - Available environment variables:
-     ```
-     # LLM API Keys
-     OPENAI_API_KEY=your_key_here
-     ANTHROPIC_API_KEY=your_key_here
-     GOOGLE_API_KEY=your_key_here
-
-     # Browser Settings
-     CHROME_PERSISTENT_SESSION=true   # Set to true to keep browser open between AI tasks
-     RESOLUTION=1920x1080x24         # Custom resolution format: WIDTHxHEIGHTxDEPTH
-     RESOLUTION_WIDTH=1920           # Custom width in pixels
-     RESOLUTION_HEIGHT=1080          # Custom height in pixels
-
-     # VNC Settings
-     VNC_PASSWORD=your_vnc_password  # Optional, defaults to "vncpassword"
-     ```
-
-2. **Platform Support:**
-   - Supports both AMD64 and ARM64 architectures
-   - For ARM64 systems (e.g., Apple Silicon Macs), the container will automatically use the appropriate image
-
-3. **Browser Persistence Modes:**
-   - **Default Mode (CHROME_PERSISTENT_SESSION=false):**
-     - Browser opens and closes with each AI task
-     - Clean state for each interaction
-     - Lower resource usage
-
-   - **Persistent Mode (CHROME_PERSISTENT_SESSION=true):**
-     - Browser stays open between AI tasks
-     - Maintains history and state
-     - Allows viewing previous AI interactions
-     - Set in `.env` file or via environment variable when starting container
-
-4. **Viewing Browser Interactions:**
-   - Access the noVNC viewer at `http://localhost:6080/vnc.html`
-   - Enter the VNC password (default: "vncpassword" or what you set in VNC_PASSWORD)
-   - Direct VNC access available on port 5900 (mapped to container port 5901)
-   - You can now see all browser interactions in real-time
-
-5. **Container Management:**
-   ```bash
-   # Start with persistent browser
-   CHROME_PERSISTENT_SESSION=true docker compose up -d
-
-   # Start with default mode (browser closes after tasks)
-   docker compose up -d
-
-   # View logs
-   docker compose logs -f
-
-   # Stop the container
-   docker compose down
-   ```
 
 ## Changelog
+- [x] **2025/03/06:** Thanks @Nobukins, you made magic comes true, Bykilt!
 - [x] **2025/01/26:** Thanks to @vvincent1234. Now browser-use-webui can combine with DeepSeek-r1 to engage in deep thinking!
 - [x] **2025/01/10:** Thanks to @casistack. Now we have Docker Setup option and also Support keep browser open between tasks.[Video tutorial demo](https://github.com/browser-use/web-ui/issues/1#issuecomment-2582511750).
 - [x] **2025/01/06:** Thanks to @richard-devbot. A New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
