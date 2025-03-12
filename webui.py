@@ -438,8 +438,11 @@ async def run_custom_agent(
 
         # Create and run agent
         if _global_agent is None:
+            # Extract the task string for display purposes
+            task_string = task["combined_prompt"] if isinstance(task, dict) and "combined_prompt" in task else str(task)
+            
             _global_agent = CustomAgent(
-                task=task,
+                task=task_string,  # Use the string version for display
                 add_infos=add_infos,
                 use_vision=use_vision,
                 llm=llm,
@@ -451,6 +454,10 @@ async def run_custom_agent(
                 max_actions_per_step=max_actions_per_step,
                 tool_calling_method=tool_calling_method
             )
+            
+            # If task is a dictionary, store it separately for processing
+            if isinstance(task, dict):
+                setattr(_global_agent, 'task_dict', task)
         history = await _global_agent.run(max_steps=max_steps)
 
         history_file = os.path.join(save_agent_history_path, f"{_global_agent.agent_id}.json")
@@ -565,7 +572,7 @@ async def run_with_stream(
             save_agent_history_path=save_agent_history_path,
             save_trace_path=save_trace_path,
             enable_recording=enable_recording,
-            task=task if isinstance(task, dict) else {"task": task},
+            task=task,
             add_infos=add_infos,
             max_steps=max_steps,
             use_vision=use_vision,
@@ -601,7 +608,7 @@ async def run_with_stream(
                     save_agent_history_path=save_agent_history_path,
                     save_trace_path=save_trace_path,
                     enable_recording=enable_recording,
-                    task=task if isinstance(task, dict) else {"task": task},
+                    task=task,
                     add_infos=add_infos,
                     max_steps=max_steps,
                     use_vision=use_vision,
@@ -1175,8 +1182,8 @@ def create_ui(config, theme_name="Ocean"):
 
 def main():
     parser = argparse.ArgumentParser(description="Gradio UI for Browser Agent")
-    parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
-    parser.add_argument("--port", type=int, default=7788, help="Port to listen on")
+    parser.add_argument("--ip", type=str, default="0.0.0.0", help="IP address to bind to")
+    parser.add_argument("--port", type=int, default=int(os.environ.get("PORT", 7788)), help="Port to listen on")
     parser.add_argument("--theme", type=str, default="Ocean", choices=theme_map.keys(), help="Theme to use for the UI")
     parser.add_argument("--dark-mode", action="store_true", help="Enable dark mode")
     args = parser.parse_args()
