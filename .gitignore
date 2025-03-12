@@ -187,3 +187,48 @@ data/
 
 # For Config Files (Current Settings)
 .config.pkl
+
+# Environment variables
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+
+# Temporary files
+tmp/
+*.tmp
+*.bak
+*.swp
+*~
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+
+# Browser recordings and traces
+record_videos/
+traces/
+agent_history/

@@ -2,6 +2,7 @@ import pdb
 import logging
 
 from dotenv import load_dotenv
+from PyPDF2 import PdfReader
 
 load_dotenv()
 import os
@@ -50,7 +51,8 @@ async def stop_agent():
 
     try:
         # Request stop
-        _global_agent.stop()
+        if _global_agent is not None:
+            _global_agent.stop()
 
         # Update UI immediately
         message = "Stop requested - the agent will halt at the next safe point"
@@ -456,11 +458,27 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    pdf_upload
 ):
     global _global_agent_state
-    stream_vw = 80
-    stream_vh = int(80 * window_h // window_w)
+    
+    # Process PDF if uploaded
+    if pdf_upload is not None:
+        try:
+            reader = PdfReader(pdf_upload.name)
+            pdf_content = ""
+            for page in reader.pages:
+                pdf_content += page.extract_text() + "\n"
+            # Modify task to include PDF content as context
+            task = {
+                "pdf_content": pdf_content,
+                "user_task": task,
+                "combined_prompt": f"Using the following PDF content as context:\n\n{pdf_content}\n\nTask:\n{task}"
+            }
+        except Exception as e:
+            logger.error(f"Error reading PDF: {str(e)}")
+    
     if not headless:
         result = await run_browser_agent(
             agent_type=agent_type,
@@ -480,7 +498,7 @@ async def run_with_stream(
             save_agent_history_path=save_agent_history_path,
             save_trace_path=save_trace_path,
             enable_recording=enable_recording,
-            task=task,
+            task=task["combined_prompt"] if isinstance(task, dict) else task,
             add_infos=add_infos,
             max_steps=max_steps,
             use_vision=use_vision,
@@ -488,6 +506,8 @@ async def run_with_stream(
             tool_calling_method=tool_calling_method
         )
         # Add HTML content at the start of the result array
+        stream_vw = 100  # Default viewport width
+        stream_vh = 60   # Default viewport height
         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
         yield [html_content] + list(result)
     else:
@@ -513,7 +533,7 @@ async def run_with_stream(
                     save_agent_history_path=save_agent_history_path,
                     save_trace_path=save_trace_path,
                     enable_recording=enable_recording,
-                    task=task,
+                    task=task["combined_prompt"] if isinstance(task, dict) else task,
                     add_infos=add_infos,
                     max_steps=max_steps,
                     use_vision=use_vision,
@@ -521,12 +541,12 @@ async def run_with_stream(
                     tool_calling_method=tool_calling_method
                 )
             )
-
             # Initialize values for streaming
+            stream_vw = 100  # Default viewport width
+            stream_vh = 60   # Default viewport height
             html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
             final_result = errors = model_actions = model_thoughts = ""
             latest_videos = trace = history_file = None
-
 
             # Periodically update the stream while the agent task is running
             while not agent_task.done():
@@ -853,19 +873,27 @@ def create_ui(config, theme_name="Ocean"):
                     )
 
             with gr.TabItem("🤖 Run Agent", id=4):
-                task = gr.Textbox(
-                    label="Task Description",
-                    lines=4,
-                    placeholder="Enter your task here...",
-                    value=config['task'],
-                    info="Describe what you want the agent to do",
-                )
-                add_infos = gr.Textbox(
-                    label="Additional Information",
-                    lines=3,
-                    placeholder="Add any helpful context or instructions...",
-                    info="Optional hints to help the LLM complete the task",
-                )
+                with gr.Column():
+                    # Add PDF upload component
+                    pdf_upload = gr.File(
+                        label="Upload PDF (Optional)",
+                        file_types=[".pdf"],
+                        type="binary"
+                    )
+                    
+                    task = gr.Textbox(
+                        label="Task Description",
+                        lines=4,
+                        placeholder="Enter your task here...",
+                        value=config['task'],
+                        info="Describe what you want the agent to do",
+                    )
+                    add_infos = gr.Textbox(
+                        label="Additional Information",
+                        lines=3,
+                        placeholder="Add any helpful context or instructions...",
+                        info="Optional hints to help the LLM complete the task",
+                    )
 
                 with gr.Row():
                     run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
@@ -875,7 +903,7 @@ def create_ui(config, theme_name="Ocean"):
                     browser_view = gr.HTML(
                         value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
                         label="Live Browser View",
-                )
+                    )
             
             with gr.TabItem("🧐 Deep Research", id=5):
                 research_task_input = gr.Textbox(label="Research Task", lines=5, value="Compose a report on the use of Reinforcement Learning for training Large Language Models, encompassing its origins, current advancements, and future prospects, substantiated with examples of relevant models and techniques. The report should reflect original insights and analysis, moving beyond mere summarization of existing literature.")
@@ -928,23 +956,25 @@ def create_ui(config, theme_name="Ocean"):
                 # Run button click handler
                 run_button.click(
                     fn=run_with_stream,
-                        inputs=[
-                            agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
-                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
-                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
-                        ],
+                    inputs=[
+                        agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, 
+                        llm_base_url, llm_api_key, use_own_browser, keep_browser_open, headless, 
+                        disable_security, window_w, window_h, save_recording_path, 
+                        save_agent_history_path, save_trace_path, enable_recording, task, 
+                        add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method,
+                        pdf_upload
+                    ],
                     outputs=[
-                        browser_view,           # Browser view
-                        final_result_output,    # Final result
-                        errors_output,          # Errors
-                        model_actions_output,   # Model actions
-                        model_thoughts_output,  # Model thoughts
-                        recording_display,      # Latest recording
-                        trace_file,             # Trace file
-                        agent_history_file,     # Agent history file
-                        stop_button,            # Stop button
-                        run_button              # Run button
+                        browser_view,
+                        final_result_output,
+                        errors_output,
+                        model_actions_output,
+                        model_thoughts_output,
+                        recording_display,
+                        trace_file,
+                        agent_history_file,
+                        stop_button,
+                        run_button
                     ],
                 )
                 
