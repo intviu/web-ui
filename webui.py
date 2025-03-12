@@ -53,6 +53,10 @@ def resolve_sensitive_env_variables(text):
     if not text:
         return text
         
+    # If text is a dictionary, return it unchanged
+    if not isinstance(text, str):
+        return text
+        
     import re
     
     # Find all $SENSITIVE_* patterns
@@ -509,16 +513,36 @@ async def run_with_stream(
     # Process PDF if uploaded
     if pdf_upload is not None:
         try:
-            reader = PdfReader(pdf_upload.name)
+            # Handle both file objects and bytes objects
+            if hasattr(pdf_upload, 'name'):
+                # It's a file object from gradio
+                pdf_file = pdf_upload.name
+            else:
+                # It's a bytes object, save it to a temporary file
+                import tempfile
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                temp_file.write(pdf_upload)
+                temp_file.close()
+                pdf_file = temp_file.name
+            
+            # Now read the PDF file
+            reader = PdfReader(pdf_file)
             pdf_content = ""
             for page in reader.pages:
                 pdf_content += page.extract_text() + "\n"
+            
             # Modify task to include PDF content as context
             task = {
                 "pdf_content": pdf_content,
-                "user_task": task,
+                "user_task": task if isinstance(task, str) else task,
                 "combined_prompt": f"Using the following PDF content as context:\n\n{pdf_content}\n\nTask:\n{task}"
             }
+            
+            # If we created a temp file, clean it up
+            if not hasattr(pdf_upload, 'name'):
+                import os
+                os.unlink(pdf_file)
+            
         except Exception as e:
             logger.error(f"Error reading PDF: {str(e)}")
     
@@ -541,7 +565,7 @@ async def run_with_stream(
             save_agent_history_path=save_agent_history_path,
             save_trace_path=save_trace_path,
             enable_recording=enable_recording,
-            task=task["combined_prompt"] if isinstance(task, dict) else task,
+            task=task if isinstance(task, dict) else {"task": task},
             add_infos=add_infos,
             max_steps=max_steps,
             use_vision=use_vision,
@@ -577,7 +601,7 @@ async def run_with_stream(
                     save_agent_history_path=save_agent_history_path,
                     save_trace_path=save_trace_path,
                     enable_recording=enable_recording,
-                    task=task["combined_prompt"] if isinstance(task, dict) else task,
+                    task=task if isinstance(task, dict) else {"task": task},
                     add_infos=add_infos,
                     max_steps=max_steps,
                     use_vision=use_vision,
