@@ -501,15 +501,9 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-<<<<<<< HEAD
     tool_calling_method,
-    pdf_upload
-||||||| 4a55d47
-    tool_calling_method
-=======
-    tool_calling_method,
+    pdf_upload,
     chrome_cdp
->>>>>>> e43a54f63c40171462ba99804a5df9ef7308a192
 ):
     global _global_agent_state
     
@@ -1026,30 +1020,14 @@ def create_ui(config, theme_name="Ocean"):
                 # Run button click handler
                 run_button.click(
                     fn=run_with_stream,
-<<<<<<< HEAD
                     inputs=[
                         agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, 
                         llm_base_url, llm_api_key, use_own_browser, keep_browser_open, headless, 
                         disable_security, window_w, window_h, save_recording_path, 
                         save_agent_history_path, save_trace_path, enable_recording, task, 
                         add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method,
-                        pdf_upload
+                        pdf_upload, chrome_cdp
                     ],
-||||||| 4a55d47
-                        inputs=[
-                            agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
-                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
-                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
-                        ],
-=======
-                        inputs=[
-                            agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
-                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
-                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, chrome_cdp
-                        ],
->>>>>>> e43a54f63c40171462ba99804a5df9ef7308a192
                     outputs=[
                         browser_view,
                         final_result_output,
