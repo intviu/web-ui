@@ -45,6 +45,30 @@ _global_agent = None
 # Create the global agent state instance
 _global_agent_state = AgentState()
 
+def resolve_sensitive_env_variables(text):
+    """
+    Replace environment variable placeholders ($SENSITIVE_*) with their values.
+    Only replaces variables that start with SENSITIVE_.
+    """
+    if not text:
+        return text
+        
+    import re
+    
+    # Find all $SENSITIVE_* patterns
+    env_vars = re.findall(r'\$SENSITIVE_[A-Za-z0-9_]*', text)
+    
+    result = text
+    for var in env_vars:
+        # Remove the $ prefix to get the actual environment variable name
+        env_name = var[1:]  # removes the $
+        env_value = os.getenv(env_name)
+        if env_value is not None:
+            # Replace $SENSITIVE_VAR_NAME with its value
+            result = result.replace(var, env_value)
+        
+    return result
+
 async def stop_agent():
     """Request the agent to stop and update UI with enhanced feedback"""
     global _global_agent_state, _global_browser_context, _global_browser, _global_agent
@@ -121,7 +145,8 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        chrome_cdp
 ):
     global _global_agent_state
     _global_agent_state.clear_stop()  # Clear any previous stop requests
@@ -142,6 +167,8 @@ async def run_browser_agent(
                 glob.glob(os.path.join(save_recording_path, "*.[mM][pP]4"))
                 + glob.glob(os.path.join(save_recording_path, "*.[wW][eE][bB][mM]"))
             )
+
+        task = resolve_sensitive_env_variables(task)
 
         # Run the agent
         llm = utils.get_llm_model(
@@ -168,7 +195,8 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_calling_method=tool_calling_method
+                tool_calling_method=tool_calling_method,
+                chrome_cdp=chrome_cdp
             )
         elif agent_type == "custom":
             final_result, errors, model_actions, model_thoughts, trace_file, history_file = await run_custom_agent(
@@ -187,7 +215,8 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_calling_method=tool_calling_method
+                tool_calling_method=tool_calling_method,
+                chrome_cdp=chrome_cdp
             )
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
@@ -249,7 +278,8 @@ async def run_org_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        chrome_cdp
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state, _global_agent
@@ -258,7 +288,10 @@ async def run_org_agent(
         _global_agent_state.clear_stop()
 
         extra_chromium_args = [f"--window-size={window_w},{window_h}"]
+        cdp_url = chrome_cdp
+
         if use_own_browser:
+            cdp_url = os.getenv("CHROME_CDP", chrome_cdp)
             chrome_path = os.getenv("CHROME_PATH", None)
             if chrome_path == "":
                 chrome_path = None
@@ -269,9 +302,11 @@ async def run_org_agent(
             chrome_path = None
             
         if _global_browser is None:
+
             _global_browser = Browser(
                 config=BrowserConfig(
                     headless=headless,
+                    cdp_url=cdp_url,
                     disable_security=disable_security,
                     chrome_instance_path=chrome_path,
                     extra_chromium_args=extra_chromium_args,
@@ -283,6 +318,7 @@ async def run_org_agent(
                 config=BrowserContextConfig(
                     trace_path=save_trace_path if save_trace_path else None,
                     save_recording_path=save_recording_path if save_recording_path else None,
+                    cdp_url=cdp_url,
                     no_viewport=False,
                     browser_window_size=BrowserContextWindowSize(
                         width=window_w, height=window_h
@@ -346,7 +382,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        chrome_cdp
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state, _global_agent
@@ -355,7 +392,10 @@ async def run_custom_agent(
         _global_agent_state.clear_stop()
 
         extra_chromium_args = [f"--window-size={window_w},{window_h}"]
+        cdp_url = chrome_cdp
         if use_own_browser:
+            cdp_url = os.getenv("CHROME_CDP", chrome_cdp)
+
             chrome_path = os.getenv("CHROME_PATH", None)
             if chrome_path == "":
                 chrome_path = None
@@ -368,17 +408,19 @@ async def run_custom_agent(
         controller = CustomController()
 
         # Initialize global browser if needed
-        if _global_browser is None:
+        #if chrome_cdp not empty string nor None
+        if ((_global_browser is None) or (cdp_url and cdp_url != "" and cdp_url != None)) :
             _global_browser = CustomBrowser(
                 config=BrowserConfig(
                     headless=headless,
                     disable_security=disable_security,
+                    cdp_url=cdp_url,
                     chrome_instance_path=chrome_path,
                     extra_chromium_args=extra_chromium_args,
                 )
             )
 
-        if _global_browser_context is None:
+        if (_global_browser_context is None  or (chrome_cdp and cdp_url != "" and cdp_url != None)):
             _global_browser_context = await _global_browser.new_context(
                 config=BrowserContextConfig(
                     trace_path=save_trace_path if save_trace_path else None,
@@ -389,7 +431,8 @@ async def run_custom_agent(
                     ),
                 )
             )
-            
+
+
         # Create and run agent
         if _global_agent is None:
             _global_agent = CustomAgent(
@@ -458,8 +501,15 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
+<<<<<<< HEAD
     tool_calling_method,
     pdf_upload
+||||||| 4a55d47
+    tool_calling_method
+=======
+    tool_calling_method,
+    chrome_cdp
+>>>>>>> e43a54f63c40171462ba99804a5df9ef7308a192
 ):
     global _global_agent_state
     
@@ -503,7 +553,8 @@ async def run_with_stream(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            chrome_cdp=chrome_cdp
         )
         # Add HTML content at the start of the result array
         stream_vw = 100  # Default viewport width
@@ -538,7 +589,8 @@ async def run_with_stream(
                     max_steps=max_steps,
                     use_vision=use_vision,
                     max_actions_per_step=max_actions_per_step,
-                    tool_calling_method=tool_calling_method
+                    tool_calling_method=tool_calling_method,
+                    chrome_cdp=chrome_cdp
                 )
             )
             # Initialize values for streaming
@@ -652,7 +704,7 @@ async def close_global_browser():
         await _global_browser.close()
         _global_browser = None
         
-async def run_deep_search(research_task, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless):
+async def run_deep_search(research_task, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless, chrome_cdp):
     from src.utils.deep_research import deep_research
     global _global_agent_state
 
@@ -672,7 +724,8 @@ async def run_deep_search(research_task, max_search_iteration_input, max_query_p
                                                         max_query_num=max_query_per_iter_input,
                                                         use_vision=use_vision,
                                                         headless=headless,
-                                                        use_own_browser=use_own_browser
+                                                        use_own_browser=use_own_browser,
+                                                        chrome_cdp=chrome_cdp
                                                         )
     
     return markdown_content, file_path, gr.update(value="Stop", interactive=True),  gr.update(interactive=True) 
@@ -848,6 +901,23 @@ def create_ui(config, theme_name="Ocean"):
                             info="Browser window height",
                         )
 
+
+                    save_recording_path = gr.Textbox(
+                        label="Recording Path",
+                        placeholder="e.g. ./tmp/record_videos",
+                        value=config['save_recording_path'],
+                        info="Path to save browser recordings",
+                        interactive=True,  # Allow editing only if recording is enabled
+                    )
+
+                    chrome_cdp = gr.Textbox(
+                        label="CDP URL",
+                        placeholder="http://localhost:9222",
+                        value="",
+                        info="CDP for google remote debugging",
+                        interactive=True,  # Allow editing only if recording is enabled
+                    )
+
                     save_recording_path = gr.Textbox(
                         label="Recording Path",
                         placeholder="e.g. ./tmp/record_videos",
@@ -956,6 +1026,7 @@ def create_ui(config, theme_name="Ocean"):
                 # Run button click handler
                 run_button.click(
                     fn=run_with_stream,
+<<<<<<< HEAD
                     inputs=[
                         agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, 
                         llm_base_url, llm_api_key, use_own_browser, keep_browser_open, headless, 
@@ -964,6 +1035,21 @@ def create_ui(config, theme_name="Ocean"):
                         add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method,
                         pdf_upload
                     ],
+||||||| 4a55d47
+                        inputs=[
+                            agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
+                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
+                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
+                        ],
+=======
+                        inputs=[
+                            agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
+                            use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
+                            save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, chrome_cdp
+                        ],
+>>>>>>> e43a54f63c40171462ba99804a5df9ef7308a192
                     outputs=[
                         browser_view,
                         final_result_output,
@@ -981,7 +1067,7 @@ def create_ui(config, theme_name="Ocean"):
                 # Run Deep Research
                 research_button.click(
                         fn=run_deep_search,
-                        inputs=[research_task_input, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless],
+                        inputs=[research_task_input, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless, chrome_cdp],
                         outputs=[markdown_output_display, markdown_download, stop_research_button, research_button]
                 )
                 # Bind the stop button click event after errors_output is defined
