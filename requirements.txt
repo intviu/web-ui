@@ -7,4 +7,3 @@ PyPDF2
 python-dotenv
 langchain-ollama
 playwright
-gunicorn
