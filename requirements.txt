@@ -6,4 +6,4 @@ langchain-mistralai==0.2.4
 PyPDF2
 python-dotenv
 langchain-ollama
-playwright
+playwright>=1.30.0
