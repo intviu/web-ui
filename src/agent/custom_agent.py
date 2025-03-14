@@ -1,42 +1,31 @@
-import json
-import logging
-import pdb
-import traceback
-from typing import Optional, Type, List, Dict, Any, Callable
-from PIL import Image, ImageDraw, ImageFont
-import os
 import base64
 import io
+import json
+import logging
+import os
 import platform
-from browser_use.agent.prompts import SystemPrompt, AgentMessagePrompt
+from typing import Any, Callable, Dict, List, Optional, Type
+
+from browser_use.agent.prompts import AgentMessagePrompt, PlannerPrompt, SystemPrompt
 from browser_use.agent.service import Agent
 from browser_use.agent.views import (
-    ActionResult,
     ActionModel,
+    ActionResult,
     AgentHistoryList,
     AgentOutput,
-    AgentHistory,
 )
 from browser_use.browser.browser import Browser
 from browser_use.browser.context import BrowserContext
-from browser_use.browser.views import BrowserStateHistory
 from browser_use.controller.service import Controller
 from browser_use.telemetry.views import (
     AgentEndTelemetryEvent,
-    AgentRunTelemetryEvent,
     AgentStepTelemetryEvent,
 )
 from browser_use.utils import time_execution_async
-from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import (
-    BaseMessage,
-    HumanMessage,
-    AIMessage
-)
-from browser_use.agent.prompts import PlannerPrompt
-
 from json_repair import repair_json
-from src.utils.agent_state import AgentState
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import BaseMessage, HumanMessage
+from PIL import Image, ImageFont
 
 from .custom_message_manager import CustomMessageManager
 from .custom_views import CustomAgentOutput, CustomAgentStepInfo
@@ -46,59 +35,59 @@ logger = logging.getLogger(__name__)
 
 class CustomAgent(Agent):
     def __init__(
-            self,
-            task: str,
-            llm: BaseChatModel,
-            add_infos: str = "",
-            browser: Browser | None = None,
-            browser_context: BrowserContext | None = None,
-            controller: Controller = Controller(),
-            use_vision: bool = True,
-            use_vision_for_planner: bool = False,
-            save_conversation_path: Optional[str] = None,
-            save_conversation_path_encoding: Optional[str] = 'utf-8',
-            max_failures: int = 3,
-            retry_delay: int = 10,
-            system_prompt_class: Type[SystemPrompt] = SystemPrompt,
-            agent_prompt_class: Type[AgentMessagePrompt] = AgentMessagePrompt,
-            max_input_tokens: int = 128000,
-            validate_output: bool = False,
-            message_context: Optional[str] = None,
-            generate_gif: bool | str = True,
-            sensitive_data: Optional[Dict[str, str]] = None,
-            available_file_paths: Optional[list[str]] = None,
-            include_attributes: list[str] = [
-                'title',
-                'type',
-                'name',
-                'role',
-                'tabindex',
-                'aria-label',
-                'placeholder',
-                'value',
-                'alt',
-                'aria-expanded',
-            ],
-            max_error_length: int = 400,
-            max_actions_per_step: int = 10,
-            tool_call_in_content: bool = True,
-            initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
-            # Cloud Callbacks
-            register_new_step_callback: Callable[['BrowserState', 'AgentOutput', int], None] | None = None,
-            register_done_callback: Callable[['AgentHistoryList'], None] | None = None,
-            tool_calling_method: Optional[str] = 'auto',
-            page_extraction_llm: Optional[BaseChatModel] = None,
-            planner_llm: Optional[BaseChatModel] = None,
-            planner_interval: int = 1,  # Run planner every N steps
+        self,
+        task: str,
+        llm: BaseChatModel,
+        add_infos: str = "",
+        browser: Browser | None = None,
+        browser_context: BrowserContext | None = None,
+        controller: Controller = Controller(),
+        use_vision: bool = True,
+        use_vision_for_planner: bool = False,
+        save_conversation_path: Optional[str] = None,
+        save_conversation_path_encoding: Optional[str] = "utf-8",
+        max_failures: int = 3,
+        retry_delay: int = 10,
+        system_prompt_class: Type[SystemPrompt] = SystemPrompt,
+        agent_prompt_class: Type[AgentMessagePrompt] = AgentMessagePrompt,
+        max_input_tokens: int = 128000,
+        validate_output: bool = False,
+        message_context: Optional[str] = None,
+        generate_gif: bool | str = True,
+        sensitive_data: Optional[Dict[str, str]] = None,
+        available_file_paths: Optional[list[str]] = None,
+        include_attributes: list[str] = [
+            "title",
+            "type",
+            "name",
+            "role",
+            "tabindex",
+            "aria-label",
+            "placeholder",
+            "value",
+            "alt",
+            "aria-expanded",
+        ],
+        max_error_length: int = 400,
+        max_actions_per_step: int = 10,
+        tool_call_in_content: bool = True,
+        initial_actions: Optional[List[Dict[str, Dict[str, Any]]]] = None,
+        # Cloud Callbacks
+        register_new_step_callback: Callable[["BrowserState", "AgentOutput", int], None]
+        | None = None,
+        register_done_callback: Callable[["AgentHistoryList"], None] | None = None,
+        tool_calling_method: Optional[str] = "auto",
+        page_extraction_llm: Optional[BaseChatModel] = None,
+        planner_llm: Optional[BaseChatModel] = None,
+        planner_interval: int = 1,  # Run planner every N steps
     ):
-
         # Load sensitive data from environment variables
         env_sensitive_data = {}
         for key, value in os.environ.items():
-            if key.startswith('SENSITIVE_'):
-                env_key = key.replace('SENSITIVE_', '', 1).lower()
+            if key.startswith("SENSITIVE_"):
+                env_key = key.replace("SENSITIVE_", "", 1).lower()
                 env_sensitive_data[env_key] = value
-    
+
         # Merge environment variables with provided sensitive_data
         if sensitive_data is None:
             sensitive_data = {}
