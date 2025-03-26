@@ -35,6 +35,7 @@ services:
       - CHROME_DEBUGGING_HOST=localhost
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/.aws/credentials:/root/.aws/credentials
     restart: unless-stopped
     shm_size: '2gb'
     cap_add:

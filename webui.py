@@ -94,31 +94,6 @@ async def stop_agent():
             gr.update(value="Stop", interactive=True),
             gr.update(interactive=True)
         )
-        
-async def stop_research_agent():
-    """Request the agent to stop and update UI with enhanced feedback"""
-    global _global_agent_state, _global_browser_context, _global_browser
-
-    try:
-        # Request stop
-        _global_agent_state.request_stop()
-
-        # Update UI immediately
-        message = "Stop requested - the agent will halt at the next safe point"
-        logger.info(f"🛑 {message}")
-
-        # Return UI updates
-        return (                                   # errors_output
-            gr.update(value="Stopping...", interactive=False),  # stop_button
-            gr.update(interactive=False),                      # run_button
-        )
-    except Exception as e:
-        error_msg = f"Error during stop: {str(e)}"
-        logger.error(error_msg)
-        return (
-            gr.update(value="Stop", interactive=True),
-            gr.update(interactive=True)
-        )
 
 async def run_browser_agent(
         agent_type,
@@ -657,32 +632,6 @@ async def close_global_browser():
     if _global_browser:
         await _global_browser.close()
         _global_browser = None
-        
-async def run_deep_search(research_task, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless):
-    from src.utils.deep_research import deep_research
-    global _global_agent_state
-
-    # Clear any previous stop request
-    _global_agent_state.clear_stop()
-    
-    llm = utils.get_llm_model(
-            provider=llm_provider,
-            model_name=llm_model_name,
-            num_ctx=llm_num_ctx,
-            temperature=llm_temperature,
-            base_url=llm_base_url,
-            api_key=llm_api_key,
-        )
-    markdown_content, file_path = await deep_research(research_task, llm, _global_agent_state,
-                                                        max_search_iterations=max_search_iteration_input,
-                                                        max_query_num=max_query_per_iter_input,
-                                                        use_vision=use_vision,
-                                                        headless=headless,
-                                                        use_own_browser=use_own_browser
-                                                        )
-    
-    return markdown_content, file_path, gr.update(value="Stop", interactive=True),  gr.update(interactive=True) 
-    
 
 def create_ui(config, theme_name="Ocean"):
     css = """
@@ -715,7 +664,40 @@ def create_ui(config, theme_name="Ocean"):
             )
 
         with gr.Tabs() as tabs:
-            with gr.TabItem("⚙️ Agent Settings", id=1):
+            with gr.TabItem("🤖 Run Agent", id=1):
+                prerequisite = gr.Textbox(
+                    label="Prerequisite",
+                    lines=10,
+                    placeholder="Add any prerequisites...",
+                    value=config['prerequisite'],
+                    info="Optional prerequisites for the task",
+                )
+                                
+                task = gr.Textbox(
+                    label="Task Description",
+                    lines=4,
+                    placeholder="Enter your task here...",
+                    value=config['task'],
+                    info="Describe what you want the agent to do",
+                )
+
+                add_infos = gr.Textbox(
+                    label="Additional Information",
+                    lines=3,
+                    placeholder="Add any helpful context or instructions...",
+                    info="Optional hints to help the LLM complete the task",
+                )
+
+                with gr.Row():
+                    run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
+                    stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
+                    
+                with gr.Row():
+                    browser_view = gr.HTML(
+                        value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
+                        label="Live Browser View",
+                )
+            with gr.TabItem("⚙️ Agent Settings", id=2):
                 with gr.Group():
                     agent_type = gr.Radio(
                         ["org", "custom"],
@@ -756,7 +738,7 @@ def create_ui(config, theme_name="Ocean"):
                             visible=False
                         )
 
-            with gr.TabItem("🔧 LLM Configuration", id=2):
+            with gr.TabItem("🔧 LLM Configuration", id=3):
                 with gr.Group():
                     llm_provider = gr.Dropdown(
                         choices=[provider for provider,model in utils.model_names.items()],
@@ -813,7 +795,7 @@ def create_ui(config, theme_name="Ocean"):
                 outputs=llm_num_ctx
             )
 
-            with gr.TabItem("🌐 Browser Settings", id=3):
+            with gr.TabItem("🌐 Browser Settings", id=4):
                 with gr.Group():
                     with gr.Row():
                         use_own_browser = gr.Checkbox(
@@ -878,44 +860,7 @@ def create_ui(config, theme_name="Ocean"):
                         interactive=True,
                     )
 
-            with gr.TabItem("🤖 Run Agent", id=4):
-                task = gr.Textbox(
-                    label="Task Description",
-                    lines=4,
-                    placeholder="Enter your task here...",
-                    value=config['task'],
-                    info="Describe what you want the agent to do",
-                )
-                add_infos = gr.Textbox(
-                    label="Additional Information",
-                    lines=3,
-                    placeholder="Add any helpful context or instructions...",
-                    info="Optional hints to help the LLM complete the task",
-                )
-
-                with gr.Row():
-                    run_button = gr.Button("▶️ Run Agent", variant="primary", scale=2)
-                    stop_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
-                    
-                with gr.Row():
-                    browser_view = gr.HTML(
-                        value="<h1 style='width:80vw; height:50vh'>Waiting for browser session...</h1>",
-                        label="Live Browser View",
-                )
-            
-            with gr.TabItem("🧐 Deep Research", id=5):
-                research_task_input = gr.Textbox(label="Research Task", lines=5, value="Compose a report on the use of Reinforcement Learning for training Large Language Models, encompassing its origins, current advancements, and future prospects, substantiated with examples of relevant models and techniques. The report should reflect original insights and analysis, moving beyond mere summarization of existing literature.")
-                with gr.Row():
-                    max_search_iteration_input = gr.Number(label="Max Search Iteration", value=3, precision=0) # precision=0 确保是整数
-                    max_query_per_iter_input = gr.Number(label="Max Query per Iteration", value=1, precision=0) # precision=0 确保是整数
-                with gr.Row():
-                    research_button = gr.Button("▶️ Run Deep Research", variant="primary", scale=2)
-                    stop_research_button = gr.Button("⏹️ Stop", variant="stop", scale=1)
-                markdown_output_display = gr.Markdown(label="Research Report")
-                markdown_download = gr.File(label="Download Research Report")
-
-
-            with gr.TabItem("📊 Results", id=6):
+            with gr.TabItem("📊 Results", id=5):
                 with gr.Group():
 
                     recording_display = gr.Video(label="Latest Recording")
@@ -972,19 +917,6 @@ def create_ui(config, theme_name="Ocean"):
                         stop_button,            # Stop button
                         run_button              # Run button
                     ],
-                )
-                
-                # Run Deep Research
-                research_button.click(
-                        fn=run_deep_search,
-                        inputs=[research_task_input, max_search_iteration_input, max_query_per_iter_input, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key, use_vision, use_own_browser, headless],
-                        outputs=[markdown_output_display, markdown_download, stop_research_button, research_button]
-                )
-                # Bind the stop button click event after errors_output is defined
-                stop_research_button.click(
-                    fn=stop_research_agent,
-                    inputs=[],
-                    outputs=[stop_research_button, research_button],
                 )
 
             with gr.TabItem("🎥 Recordings", id=7):

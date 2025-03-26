@@ -12,8 +12,22 @@ def default_config():
         "max_actions_per_step": 10,
         "use_vision": True,
         "tool_calling_method": "auto",
-        "llm_provider": "openai",
-        "llm_model_name": "gpt-4o",
+        "llm_provider": "bedrock",
+        "llm_model_name": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "prerequisite": """
+import boto3
+
+session = boto3.Session(region_name="us-west-2")
+sagemaker_client = session.client("sagemaker")
+
+response = sagemaker_client.create_presigned_domain_url(
+    DomainId="d-1234567890",
+    UserProfileName="arkaprav-ssh-test"
+    )
+
+PLACEHOLDER = response["AuthorizedUrl"]
+
+""",
         "llm_num_ctx": 32000,
         "llm_temperature": 1.0,
         "llm_base_url": "",
