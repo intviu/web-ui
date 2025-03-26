@@ -89,8 +89,12 @@ class CustomAgent(Agent):
             tool_calling_method: Optional[str] = 'auto',
             page_extraction_llm: Optional[BaseChatModel] = None,
             planner_llm: Optional[BaseChatModel] = None,
-            planner_interval: int = 1,  # Run planner every N steps
+            planner_interval: int = 1,  # Run planner every N steps,
+            placeholders: Optional[str] = None,
     ):
+
+        # make placeholders available to the class
+        self.placeholders = placeholders
 
         # Load sensitive data from environment variables
         env_sensitive_data = {}
@@ -239,6 +243,14 @@ class CustomAgent(Agent):
 
         ai_content = ai_content.replace("```json", "").replace("```", "")
         ai_content = repair_json(ai_content)
+
+
+        # Replace placeholders in ai_content with values from self.placeholders
+        for key, value in self.placeholders.items():
+            print(key, value)
+            ai_content = ai_content.replace(key, value)
+
+        
         parsed_json = json.loads(ai_content)
         parsed: AgentOutput = self.AgentOutput(**parsed_json)
 

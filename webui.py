@@ -118,7 +118,8 @@ async def run_browser_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        placeholders
 ):
     global _global_agent_state
     _global_agent_state.clear_stop()  # Clear any previous stop requests
@@ -186,7 +187,8 @@ async def run_browser_agent(
                 max_steps=max_steps,
                 use_vision=use_vision,
                 max_actions_per_step=max_actions_per_step,
-                tool_calling_method=tool_calling_method
+                tool_calling_method=tool_calling_method,
+                placeholders=placeholders
             )
         else:
             raise ValueError(f"Invalid agent type: {agent_type}")
@@ -345,7 +347,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        placeholders
 ):
     try:
         global _global_browser, _global_browser_context, _global_agent_state, _global_agent
@@ -402,7 +405,8 @@ async def run_custom_agent(
                 system_prompt_class=CustomSystemPrompt,
                 agent_prompt_class=CustomAgentMessagePrompt,
                 max_actions_per_step=max_actions_per_step,
-                tool_calling_method=tool_calling_method
+                tool_calling_method=tool_calling_method,
+                placeholders=placeholders
             )
         history = await _global_agent.run(max_steps=max_steps)
 
@@ -457,8 +461,27 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    prerequisite
 ):
+    
+    # Execute the prerequisite variable as Python code
+    global_vars = {}
+    try:
+        if prerequisite.strip():
+            exec(prerequisite, globals(), global_vars)
+    except Exception as e:
+        raise RuntimeError(f"Error executing prerequisite: {str(e)}")
+
+    # Export all global variables into a map
+
+    # get PLACEHOLDERS key value as dict from global_vars.items()
+    placeholders = dict(global_vars.items())["PLACEHOLDERS"]
+    
+    print("arkaprava")
+    print(placeholders)
+
+
     global _global_agent_state
     stream_vw = 80
     stream_vh = int(80 * window_h // window_w)
@@ -486,7 +509,8 @@ async def run_with_stream(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            placeholders=placeholders
         )
         # Add HTML content at the start of the result array
         html_content = f"<h1 style='width:{stream_vw}vw; height:{stream_vh}vh'>Using browser...</h1>"
@@ -519,7 +543,8 @@ async def run_with_stream(
                     max_steps=max_steps,
                     use_vision=use_vision,
                     max_actions_per_step=max_actions_per_step,
-                    tool_calling_method=tool_calling_method
+                    tool_calling_method=tool_calling_method,
+                    placeholders=placeholders
                 )
             )
 
@@ -903,7 +928,7 @@ def create_ui(config, theme_name="Ocean"):
                             agent_type, llm_provider, llm_model_name, llm_num_ctx, llm_temperature, llm_base_url, llm_api_key,
                             use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                             save_recording_path, save_agent_history_path, save_trace_path,  # Include the new path
-                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method
+                            enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step, tool_calling_method, prerequisite
                         ],
                     outputs=[
                         browser_view,           # Browser view

@@ -15,17 +15,21 @@ def default_config():
         "llm_provider": "bedrock",
         "llm_model_name": "anthropic.claude-3-5-sonnet-20241022-v2:0",
         "prerequisite": """
+
 import boto3
 
 session = boto3.Session(region_name="us-west-2")
 sagemaker_client = session.client("sagemaker")
 
 response = sagemaker_client.create_presigned_domain_url(
-    DomainId="d-1234567890",
+    DomainId="d-8aldpksok8tq",
     UserProfileName="arkaprav-ssh-test"
     )
 
-PLACEHOLDER = response["AuthorizedUrl"]
+PLACEHOLDERS={}
+PLACEHOLDERS["PLACEHOLDER_URL"] = response["AuthorizedUrl"]
+
+
 
 """,
         "llm_num_ctx": 32000,
@@ -42,7 +46,7 @@ PLACEHOLDER = response["AuthorizedUrl"]
         "save_recording_path": "./tmp/record_videos",
         "save_trace_path": "./tmp/traces",
         "save_agent_history_path": "./tmp/agent_history",
-        "task": "go to google.com and type 'OpenAI' click search and give me the first url",
+        "task": "open PLACEHOLDER_URL and open space names test1234 else create it",
     }
 
 
