@@ -225,3 +225,72 @@ CHROME_PERSISTENT_SESSION=true docker compose up --build
 - [x] **2025/01/26:** Thanks to @vvincent1234. Now browser-use-webui can combine with DeepSeek-r1 to engage in deep thinking!
 - [x] **2025/01/10:** Thanks to @casistack. Now we have Docker Setup option and also Support keep browser open between tasks.[Video tutorial demo](https://github.com/browser-use/web-ui/issues/1#issuecomment-2582511750).
 - [x] **2025/01/06:** Thanks to @richard-devbot. A New and Well-Designed WebUI is released. [Video tutorial demo](https://github.com/warmshao/browser-use-webui/issues/1#issuecomment-2573393113).
+
+# TARA Web UI
+
+This is the frontend application for TARA (Task Automation & Resource Assistant).
+
+## Prerequisites
+
+1. Install Node.js and npm:
+   - Visit [Node.js official website](https://nodejs.org/)
+   - Download and install the LTS (Long Term Support) version
+   - Verify installation by running:
+     ```bash
+     node --version
+     npm --version
+     ```
+
+2. Install project dependencies:
+   ```bash
+   cd web-ui
+   npm install
+   ```
+
+## Development
+
+To start the development server:
+
+```bash
+npm start
+```
+
+The application will be available at [http://localhost:3000](http://localhost:3000).
+
+## Building for Production
+
+To create a production build:
+
+```bash
+npm run build
+```
+
+## Project Structure
+
+```
+web-ui/
+├── public/          # Static files
+├── src/
+│   ├── components/  # React components
+│   ├── types/       # TypeScript type definitions
+│   ├── theme.ts     # Chakra UI theme configuration
+│   ├── App.tsx      # Main application component
+│   └── index.tsx    # Application entry point
+├── package.json     # Project dependencies and scripts
+└── tsconfig.json    # TypeScript configuration
+```
+
+## Available Scripts
+
+- `npm start`: Runs the app in development mode
+- `npm test`: Launches the test runner
+- `npm run build`: Builds the app for production
+- `npm run eject`: Ejects from Create React App
+
+## Dependencies
+
+- React 18
+- TypeScript
+- Chakra UI
+- React Router
+- React Icons

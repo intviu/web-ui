@@ -4,17 +4,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 import sys
-
-sys.path.append(".")
-import asyncio
 import os
-import sys
+from pathlib import Path
+
+# Add web-ui directory to Python path
+web_ui_dir = str(Path(__file__).parent.parent)
+if web_ui_dir not in sys.path:
+    sys.path.append(web_ui_dir)
+
+# Add src directory to Python path
+src_dir = str(Path(__file__).parent.parent / "src")
+if src_dir not in sys.path:
+    sys.path.append(src_dir)
+
+import asyncio
 from pprint import pprint
 
-from browser_use import Agent
-from browser_use.agent.views import AgentHistoryList
-
-from src.utils import utils
+# Import from our browser_use package
+from browser_use import Agent, Browser, BrowserConfig, BrowserContextConfig, BrowserContextWindowSize, AgentHistoryList
+# Import from our utils module
+from browser_use.utils import get_llm_model
 
 
 async def test_browser_use_org():
@@ -38,7 +47,7 @@ async def test_browser_use_org():
     #     temperature=0.8
     # )
     
-    llm = utils.get_llm_model(
+    llm = get_llm_model(
         provider="ollama", model_name="deepseek-r1:14b", temperature=0.5
     )
 
@@ -85,7 +94,7 @@ async def test_browser_use_org():
         pprint(history.final_result(), indent=4)
 
         print("\nErrors:")
-        pprint(history.errors(), indent=4)
+        pprint(history.error_list, indent=4)
 
         # e.g. xPaths the model clicked on
         print("\nModel Outputs:")
@@ -118,7 +127,7 @@ async def test_browser_use_custom():
     #     api_key=os.getenv("OPENAI_API_KEY", ""),
     # )
 
-    llm = utils.get_llm_model(
+    llm = get_llm_model(
         provider="azure_openai",
         model_name="gpt-4o",
         temperature=0.8,
@@ -210,7 +219,7 @@ async def test_browser_use_custom():
         pprint(history.final_result(), indent=4)
 
         print("\nErrors:")
-        pprint(history.errors(), indent=4)
+        pprint(history.error_list, indent=4)
 
         # e.g. xPaths the model clicked on
         print("\nModel Outputs:")
@@ -263,7 +272,7 @@ async def test_browser_use_parallel():
     #     api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
     # )
 
-    llm = utils.get_llm_model(
+    llm = get_llm_model(
         provider="gemini",
         model_name="gemini-2.0-flash-exp",
         temperature=1.0,
@@ -331,7 +340,7 @@ async def test_browser_use_parallel():
         pprint(history.final_result(), indent=4)
 
         print("\nErrors:")
-        pprint(history.errors(), indent=4)
+        pprint(history.error_list, indent=4)
 
         # e.g. xPaths the model clicked on
         print("\nModel Outputs:")
@@ -356,6 +365,6 @@ async def test_browser_use_parallel():
             await browser.close()
 
 if __name__ == "__main__":
-    # asyncio.run(test_browser_use_org())
+    asyncio.run(test_browser_use_org())
     # asyncio.run(test_browser_use_parallel())
-    asyncio.run(test_browser_use_custom())
+    # asyncio.run(test_browser_use_custom())
