@@ -60,7 +60,7 @@ RUN pip install --upgrade setuptools wheel
 # Install problematic packages separately using pip directly
 RUN pip install --no-cache-dir pyperclip==1.9.0 html2text
 
-# Copy requirements and install Python dependencies
+# Copy only requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -69,8 +69,11 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN playwright install --with-deps chromium
 RUN playwright install-deps
 
-# Copy the application code
-COPY . .
+# Copy essential configuration files only
+# Exclude src directory and webui.py as they will be mounted
+COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
@@ -86,8 +89,7 @@ ENV RESOLUTION_HEIGHT=1080
 
 # Set up supervisor configuration
 RUN mkdir -p /var/log/supervisor
-COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 EXPOSE 7788 6080 5901
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/entrypoint.sh"]
