@@ -53,6 +53,13 @@ ARG TARGETPLATFORM=linux/amd64
 # Set up working directory
 WORKDIR /app
 
+RUN pip install --upgrade pip
+
+RUN pip install --upgrade setuptools wheel
+
+# Install problematic packages separately using pip directly
+RUN pip install --no-cache-dir pyperclip==1.9.0 html2text
+
 # Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
