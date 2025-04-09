@@ -33,6 +33,7 @@ from src.browser.custom_browser import CustomBrowser
 from src.agent.custom_prompts import CustomSystemPrompt, CustomAgentMessagePrompt
 from src.browser.custom_context import BrowserContextConfig, CustomBrowserContext
 from src.controller.custom_controller import CustomController
+from src.controller.custom_twitter_controller import CustomTwitterController
 from gradio.themes import Citrus, Default, Glass, Monochrome, Ocean, Origin, Soft, Base
 from src.utils.utils import update_model_dropdown, get_latest_files, capture_screenshot, MissingAPIKeyError
 from src.utils import utils
@@ -369,8 +370,11 @@ async def run_org_agent(
                 )
             )
 
+        controller = CustomTwitterController()
+
         if _global_agent is None:
             _global_agent = Agent(
+                controller=controller,
                 task=task,
                 llm=llm,
                 use_vision=use_vision,
@@ -381,6 +385,7 @@ async def run_org_agent(
                 max_input_tokens=max_input_tokens,
                 generate_gif=True
             )
+
         history = await _global_agent.run(max_steps=max_steps)
 
         history_file = os.path.join(save_agent_history_path, f"{_global_agent.state.agent_id}.json")
