@@ -792,7 +792,7 @@ def create_ui(theme_name="Ocean"):
         with gr.Row():
             gr.Markdown(
                 """
-                # 🌐 Browser Use WebUI
+                # 🌐 Twitter Browser Use WebUI
                 ### Control your browser with AI assistance
                 """,
                 elem_classes=["header-text"],
