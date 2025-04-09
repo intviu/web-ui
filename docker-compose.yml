@@ -44,6 +44,8 @@ services:
       - CHROME_DEBUGGING_HOST=localhost
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
+      - /home/olesia/work/project-black/local-chromium-profile-data:/app/data/chrome_data
+      - .:/app
     restart: unless-stopped
     shm_size: '2gb'
     cap_add:
