@@ -24,7 +24,8 @@ PROVIDER_DISPLAY_NAMES = {
     "google": "Google",
     "alibaba": "Alibaba",
     "moonshot": "MoonShot",
-    "unbound": "Unbound AI"
+    "unbound": "Unbound AI",
+    "xinference": "XInference",
 }
 
 
@@ -189,8 +190,17 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
+        if not kwargs.get("api_key", ""):
+            api_key = os.getenv("XINFERENCE_API_KEY", "")
+        else:
+            api_key = kwargs.get("api_key")
+
+        if not kwargs.get("model_name", ""):
+            model_name = os.getenv("XINFERENCE_MODEL", "qwen2.5-instruct")
+        else:
+            model_name = kwargs.get("model_name")
         return ChatOpenAI(
-            model=kwargs.get("model_name", "gpt-4o"),
+            model=model_name,
             temperature=kwargs.get("temperature", 0.0),
             base_url=base_url,
             api_key=api_key,
