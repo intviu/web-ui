@@ -183,6 +183,18 @@ def get_llm_model(provider: str, **kwargs):
             model_name=kwargs.get("model_name", "Qwen/QwQ-32B"),
             temperature=kwargs.get("temperature", 0.0),
         )
+    elif provider == "xinference":
+        if not kwargs.get("base_url", ""):
+            base_url = os.getenv("XINFERENCE_OPENAI_ENDPOINT", "https://api.xinference.com/v1")
+        else:
+            base_url = kwargs.get("base_url")
+
+        return ChatOpenAI(
+            model=kwargs.get("model_name", "gpt-4o"),
+            temperature=kwargs.get("temperature", 0.0),
+            base_url=base_url,
+            api_key=api_key,
+        )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -234,6 +246,10 @@ model_names = {
         "Pro/THUDM/chatglm3-6b",
         "Pro/THUDM/glm-4-9b-chat",
     ],
+    "xinference": ["qwen2.5-instruct", "qwen2.5", "qwen2.5-coder", "qwen2.5-coder-instruct", "qwen2.5-instruct-1m",
+                   "qwen2.5-vl-instruct", "deepseek", "deepseek-chat", "deepseek-coder", "deepseek-coder-instruct",
+                   "deepseek-r1", "deepseek-v2", "deepseek-v2-chat", "deepseek-v2-chat-0628", "deepseek-v2.5",
+                   "deepseek-v3", "deepseek-vl-chat", "deepseek-vl2"]
 }
 
 
