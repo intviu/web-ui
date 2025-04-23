@@ -27,6 +27,9 @@ services:
       - ALIBABA_ENDPOINT=${ALIBABA_ENDPOINT:-https://dashscope.aliyuncs.com/compatible-mode/v1}
       - ALIBABA_API_KEY=${ALIBABA_API_KEY:-}
       - MOONSHOT_ENDPOINT=${MOONSHOT_ENDPOINT:-https://api.moonshot.cn/v1}
+      - IBM_API_KEY=${IBM_API_KEY:-}
+      - IBM_ENDPOINT=${IBM_ENDPOINT:-https://us-south.ml.cloud.ibm.com}
+      - IBM_PROJECT_ID=${IBM_PROJECT_ID:-}
       - MOONSHOT_API_KEY=${MOONSHOT_API_KEY:-}
       - BROWSER_USE_LOGGING_LEVEL=${BROWSER_USE_LOGGING_LEVEL:-info}
       - ANONYMIZED_TELEMETRY=${ANONYMIZED_TELEMETRY:-false}
