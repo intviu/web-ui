@@ -158,7 +158,7 @@ def get_llm_model(provider: str, **kwargs):
         )
     elif provider == "ibm":
         parameters = {
-            "temperature": kwargs.get("temperature", 0.6),
+            "temperature": kwargs.get("temperature", 0.0),
             "max_tokens": kwargs.get("num_ctx", 32000)
         }
         if not kwargs.get("base_url", ""):
