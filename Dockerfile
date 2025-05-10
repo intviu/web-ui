@@ -58,7 +58,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install patchright and browsers with system dependencies
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-patchright
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN patchright install --with-deps chromium
 RUN patchright install-deps
 
