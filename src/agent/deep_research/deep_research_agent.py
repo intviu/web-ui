@@ -35,6 +35,12 @@ from src.agent.browser_use.browser_use_agent import BrowserUseAgent
 from src.browser.custom_browser import CustomBrowser
 from src.controller.custom_controller import CustomController
 from src.utils.mcp_client import setup_mcp_client_and_tools
+from src.agent.intent_classifier.agent import IntentClassifierAgent
+from src.webpage.webpage_checker import WebpageChecker
+from src.agent.snippet_extractor.agent import SnippetExtractorAgent
+from src.agent.qa_possibilty_checker.agent import QAPossibilityChecker
+from src.agent.prompt_enahncer.agent import PromptEnhancerAgent
+
 
 logger = logging.getLogger(__name__)
 
@@ -300,6 +306,25 @@ Provide a list of distinct search queries(up to {max_parallel_browsers}) that ar
 
 # --- Langgraph State Definition ---
 
+class InitialStepsState(TypedDict):  #this  class will act as out State storing all the output values from the agents
+    user_query: str = " "
+    url: str = " "
+    
+    intent_check: bool = False #true if the intent is QA related
+    inten_agent_msg: str = ""
+
+    webpage_check: bool = False #true if the webpage is valid
+    webpage_msg: str = ""
+    
+    extracted_snippet_agent_msg: str = ""
+    extracted_snippet: str = " "
+    snippet_check: bool = False #true if the snippet is available
+    
+    QA_possibility_agent_msg: str = ""
+    QA_possibility_check: bool = False #true if the QA is possible
+
+    enhanced_prompt_agent_msg: str = ""
+    enhanced_prompt: str = " "
 
 class ResearchTaskItem(TypedDict):
     # step: int # Maybe step within category, or just implicit by order
@@ -318,6 +343,8 @@ class ResearchCategoryItem(TypedDict):
 class DeepResearchState(TypedDict):
     task_id: str
     topic: str
+    user_query: str
+    url: str
     research_plan: List[ResearchCategoryItem]  # CHANGED
     search_results: List[Dict[str, Any]]
     llm: Any
@@ -333,6 +360,66 @@ class DeepResearchState(TypedDict):
 
 
 # --- Langgraph Nodes ---
+
+def intent_classifier(state: InitialStepsState) -> InitialStepsState:
+    logger.info("\n\n INTENT CLASSIFIER NODE...\n")
+        
+    output = IntentClassifierAgent(state["user_query"]).run_agent()
+    state["intent_check"] = output.intent
+    state["inten_agent_msg"] = output.agent_msg
+        
+    return state # return the states values to continue the graph
+    
+def webpage_checker(state: InitialStepsState) -> InitialStepsState:
+    logger.info("\n\n WEBPAGE CHECKER NODE...\n")
+    output = WebpageChecker(state["url"]).exists()
+        
+    if output:
+        logger.info("Webpage exists and is valid")
+        state['webpage_msg'] = "Webpage exists and is valid"
+        state["webpage_check"] = True
+    else:
+        logger.error("Webpage does not exist or is invalid")
+        state['webpage_msg'] = "Webpage does not exists or is invalid"
+        state["webpage_check"] = False
+            
+        return state  # return the state to continue the graph
+        
+        
+def _get_output_value(output, key, default=None):
+    if isinstance(output, dict):
+        return output.get(key, default)
+    return getattr(output, key, default)
+
+def snippet_extractor(state: InitialStepsState) -> InitialStepsState:
+    logger.info("\n\n SNIPPET EXTRACTOR  NODE...\n")
+        
+    output = SnippetExtractorAgent(user_prompt=state["user_query"], url=state["url"]).run_agent()
+    state['extracted_snippet_agent_msg'] = _get_output_value(output, "agent_msg", "")
+    state['snippet_check'] = _get_output_value(output, "snippet_check", False)
+    state['extracted_snippet'] = _get_output_value(output, "extracted_snippet", "")
+        
+    return state
+        
+def QA_possibility(state: InitialStepsState) -> InitialStepsState:
+    logger.info("\n\n QA POSSIBILTY CHECKER AGENT...\n")
+
+    output = QAPossibilityChecker(user_prompt=state["user_query"], extracted_snippet=state['extracted_snippet']).run_agent()
+    state["QA_possibility_agent_msg"] = output.agent_msg
+    state["QA_possibility_check"] = output.qa_possibilty
+
+    return state
+
+def prompt_enhancer(state: InitialStepsState) -> InitialStepsState:
+    logger.info("\n\n PROMPT ENHANCER AGENT...\n")
+
+    output = PromptEnhancerAgent(state["user_query"], extracted_snippet=state['extracted_snippet']).run_agent()
+    state['enhanced_prompt_agent_msg'] = output.agent_msg
+    state['enhanced_prompt'] = output.enhanced_prompt
+
+    # print("\n\n\n PROMPT ENHANCER OUTPUT: ", output)
+
+    return state
 
 
 def _load_previous_state(task_id: str, output_dir: str) -> Dict[str, Any]:
@@ -1085,19 +1172,25 @@ class DeepResearchAgent:
     async def run(
             self,
             topic: str,
+            user_query: str,
+            url: str,
             task_id: Optional[str] = None,
             save_dir: str = "./tmp/deep_research",
             max_parallel_browsers: int = 1,
     ) -> Dict[str, Any]:
         """
-        Starts the deep research process (Async Generator Version).
+        Starts the deep research process.
 
         Args:
             topic: The research topic.
+            user_query: The user's specific query.
+            url: The URL to analyze.
             task_id: Optional existing task ID to resume. If None, a new ID is generated.
+            save_dir: Directory to save research results.
+            max_parallel_browsers: Maximum number of parallel browser instances.
 
-        Yields:
-             Intermediate state updates or messages during execution.
+        Returns:
+            Dictionary containing the research results and status.
         """
         if self.runner and not self.runner.done():
             logger.warning(
@@ -1114,9 +1207,10 @@ class DeepResearchAgent:
         output_dir = os.path.join(save_dir, self.current_task_id)
         os.makedirs(output_dir, exist_ok=True)
 
-        logger.info(
-            f"[AsyncGen] Starting research task ID: {self.current_task_id} for topic: '{topic}'"
-        )
+        logger.info(f"[AsyncGen] Starting research task ID: {self.current_task_id}")
+        logger.info(f"[AsyncGen] Topic: {topic}")
+        logger.info(f"[AsyncGen] User Query: {user_query}")
+        logger.info(f"[AsyncGen] URL: {url}")
         logger.info(f"[AsyncGen] Output directory: {output_dir}")
 
         self.stop_event = threading.Event()
@@ -1127,6 +1221,8 @@ class DeepResearchAgent:
         initial_state: DeepResearchState = {
             "task_id": self.current_task_id,
             "topic": topic,
+            "user_query": user_query,
+            "url": url,
             "research_plan": [],
             "search_results": [],
             "messages": [],

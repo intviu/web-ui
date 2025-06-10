@@ -1,0 +1,16 @@
+[
+    {
+        "Agent Name": "Intent Classifier Agent",
+        "Number of tries": 1,
+        "TimeTaken": 1.93739914894104,
+        "User_input": "HumanMessage: {'input': 'play this song'}",
+        "Output": "SystemMessage: agent_msg='The intent is not realted to QA' intent=False"
+    },
+    {
+        "Agent Name": "Intent Classifier Agent",
+        "Number of tries": 1,
+        "TimeTaken": 1.2464182376861572,
+        "User_input": "HumanMessage: {'input': 'please test this button'}",
+        "Output": "SystemMessage: agent_msg='The intent is realted to QA' intent=True"
+    }
+]

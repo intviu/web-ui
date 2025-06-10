@@ -69,6 +69,8 @@ async def run_deep_research(webui_manager: WebuiManager, components: Dict[Compon
     markdown_display_comp = webui_manager.get_component_by_id("deep_research_agent.markdown_display")
     markdown_download_comp = webui_manager.get_component_by_id("deep_research_agent.markdown_download")
     mcp_server_config_comp = webui_manager.get_component_by_id("deep_research_agent.mcp_server_config")
+    user_query_comp = webui_manager.get_component_by_id("deep_research_agent.user_query")
+    url_comp = webui_manager.get_component_by_id("deep_research_agent.url")
 
     # --- 1. Get Task and Settings ---
     task_topic = components.get(research_task_comp, "").strip()
@@ -77,6 +79,8 @@ async def run_deep_research(webui_manager: WebuiManager, components: Dict[Compon
     base_save_dir = components.get(save_dir_comp, "./tmp/deep_research")
     mcp_server_config_str = components.get(mcp_server_config_comp)
     mcp_config = json.loads(mcp_server_config_str) if mcp_server_config_str else None
+    user_query = components.get(user_query_comp, "").strip()
+    url = components.get(url_comp, "").strip()
 
     if not task_topic:
         gr.Warning("Please enter a research task.")
@@ -152,6 +156,8 @@ async def run_deep_research(webui_manager: WebuiManager, components: Dict[Compon
         # --- 5. Start Agent Run ---
         agent_run_coro = webui_manager.dr_agent.run(
             topic=task_topic,
+            user_query=user_query,
+            url=url,
             task_id=task_id_to_resume,
             save_dir=base_save_dir,
             max_parallel_browsers=max_parallel_agents
@@ -383,6 +389,12 @@ def create_deep_research_agent_tab(webui_manager: WebuiManager):
         research_task = gr.Textbox(label="Research Task", lines=5,
                                    value="Give me a detailed travel plan to Switzerland from June 1st to 10th.",
                                    interactive=True)
+        user_query = gr.Textbox(label="User Query", lines=3,
+                               placeholder="Enter your specific query",
+                               interactive=True)
+        url = gr.Textbox(label="URL", lines=1,
+                        placeholder="Enter URL to analyze",
+                        interactive=True)
         with gr.Row():
             resume_task_id = gr.Textbox(label="Resume Task ID", value="",
                                         interactive=True)
@@ -400,6 +412,8 @@ def create_deep_research_agent_tab(webui_manager: WebuiManager):
     tab_components.update(
         dict(
             research_task=research_task,
+            user_query=user_query,
+            url=url,
             parallel_num=parallel_num,
             max_query=max_query,
             start_button=start_button,
