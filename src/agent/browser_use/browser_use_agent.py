@@ -26,7 +26,6 @@ SKIP_LLM_API_KEY_VERIFICATION = (
         os.environ.get("SKIP_LLM_API_KEY_VERIFICATION", "false").lower()[0] in "ty1"
 )
 
-
 class BrowserUseAgent(Agent):
     def _set_tool_calling_method(self) -> ToolCallingMethod | None:
         tool_calling_method = self.settings.tool_calling_method
