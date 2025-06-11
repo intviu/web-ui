@@ -2,7 +2,7 @@ import logging
 from .output import SnippetExtractorOutput
 from .prompt import agents_prompt
 from ..main_agent.agent import run_main_agent
-from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import os
 import tiktoken
@@ -32,17 +32,17 @@ class SnippetExtractorAgent:
             logger.error(f"Error storing webpage code: {e}")
             return False
 
-    def extract_webpage(self) -> bool:
+    async def extract_webpage(self) -> bool:
         logger.info(f"Extracting webpage for URL: {self.url}")
         self.webpage_code = ""
         try:
-            with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                page.goto(self.url)
-                content = page.content()
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                await page.goto(self.url)
+                content = await page.content()
                 logger.info("Webpage content fetched successfully.")
-                browser.close()
+                await browser.close()
                 logger.info("Browser closed.")
                 self.webpage_code = content
 
@@ -130,10 +130,10 @@ class SnippetExtractorAgent:
         return chunks
 
 
-    def run_agent(self) -> SnippetExtractorOutput:
+    async def run_agent(self) -> SnippetExtractorOutput:
         logger.info(f"Running Snippet Extractor Agent....")
 
-        if not self.extract_webpage():
+        if not await self.extract_webpage():
             return {
                 'actuall_snippet': "",
                 "snippet_check": False,

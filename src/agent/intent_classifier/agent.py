@@ -3,14 +3,17 @@ from .output import IntentClassifierOutput
 from .prompt import agents_prompt
 from ..main_agent.agent import run_main_agent
 import logging
+from typing import Any
+
 logger = logging.getLogger(__name__)
 
 class IntentClassifierAgent:
-    def __init__(self, user_prompt: str) -> None:
+    def __init__(self, llm: Any, user_prompt: str) -> None:
         logger.info("Initializing IntentClassifierAgent")
         self.output_pydantic_class = IntentClassifierOutput
-        self.user_prompt = user_prompt
+        self.llm = llm
         self.agent_prompt = agents_prompt
+        self.user_prompt = user_prompt
 
     def run_agent(self) -> IntentClassifierOutput:
         logger.info(f"Running Intent Classifier Agent....")
