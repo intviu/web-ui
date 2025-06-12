@@ -160,6 +160,8 @@ class AgentOrchestrator:
         ).run_agent()
         state['enhanced_prompt_agent_msg'] = output.agent_msg
         state['enhanced_prompt'] = output.enhanced_prompt
+
+        logger.info(f"\n\nEnhanced prompt: {state['enhanced_prompt']}")
         return state
 
     async def browser_ui(self, state: State) -> State:
@@ -187,7 +189,7 @@ class AgentOrchestrator:
             )
             
             # Run the browser agent
-            result = await browser_agent.run(max_steps=100)
+            result = await browser_agent.run(max_steps=30)
             
             # Store the result in state
             state["browser_result"] = result
