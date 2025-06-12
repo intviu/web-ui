@@ -189,7 +189,7 @@ class AgentOrchestrator:
             )
             
             # Run the browser agent
-            result = await browser_agent.run(max_steps=30)
+            result = await browser_agent.run(max_steps=25)
             
             # Store the result in state
             state["browser_result"] = result
