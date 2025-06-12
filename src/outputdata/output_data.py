@@ -1,6 +1,9 @@
 import json
 import os
 import logging
+from pathlib import Path
+import time
+
 logger = logging.getLogger(__name__)
 
 def write_data_to_file(
@@ -10,39 +13,56 @@ def write_data_to_file(
     user_input: float,
     output: str
     ) -> None:
-
-    result_data = {
-        "Agent Name": agents_name,
-        "Number of tries": number_of_tries,
-        "TimeTaken": time_taken,
-        "User_input": f"HumanMessage: {user_input}",
-        "Output": f"SystemMessage: {output}",
-    }
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(base_dir, "agent_execution.json")
-
-    #reading existing data if file exists, else start a new list
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                try:
-                    all_data = json.load(f)
-                    if not isinstance(all_data, list):
-                        all_data = []
-                except json.JSONDecodeError:
-                    all_data = []
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            all_data = []
-    else:
-        all_data = []
-
-    all_data.append(result_data)
-
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(all_data, f, indent=4)
-        logger.info(f"Data written to file....")
+        script_dir = Path(__file__).parent
+        output_file = script_dir / 'agent_execution.json'
+        
+        # initial_agents = [
+        #     "Intent Classifier Agent",
+        #     "Webpage Checker",
+        #     "Prompt Enhancer Agent",
+        #     "Snippet Extractor Agent",
+        #     "QA POSSIBILTY CHECKER",
+        # ]
+
+        # Create new data entry           
+        if agents_name == "Browser Use Agent":
+            new_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "evaluation": user_input,
+                "memory": output,
+                "next_goal": agents_name,
+                "actions": json.loads(number_of_tries) if isinstance(number_of_tries, str) else number_of_tries
+            }
+        else:
+             new_data = {
+                "agents_name": agents_name,
+                "number_of_tries": number_of_tries,
+                "time_taken": time_taken,
+                "user_input": user_input,
+                "output": output
+            }
+
+        # Read existing data if file exists
+        # existing_data = []
+        # if output_file.exists():
+        #     try:
+        #         with open(output_file, 'r') as f:
+        #             content = f.read()
+        #             if content.strip():  # Check if file is not empty
+        #                 existing_data = json.loads(content)
+        #                 if not isinstance(existing_data, list):
+        #                     existing_data = [existing_data]
+        #     except json.JSONDecodeError:
+        #         existing_data = []
+        
+        # # Append new data
+        # existing_data.append(new_data)
+        
+        # Write back to file
+        with open(output_file, 'a') as f:
+            json.dump(new_data, f, indent=2)
+            f.write("}")
+            
     except Exception as e:
-        logger.error(f"Error writing to file {file_path}: {e}")
+        print(f"Error writing data to file: {e}") 
