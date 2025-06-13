@@ -24,6 +24,8 @@ from src.controller.custom_controller import CustomController
 from src.utils import llm_provider
 from src.webui.webui_manager import WebuiManager
 from src.agent.orchestrator.agent_orchestrator import AgentOrchestrator
+import base64
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +139,8 @@ async def _handle_new_step(
 ):
     """Callback for each step taken by the agent, including screenshot display."""
 
+    # print("\n\n\n\n\n HANDLE NEW STEP CALLED\n\n\n\n\n")
+
     # Use the correct chat history attribute name from the user's code
     if not hasattr(webui_manager, "bu_chat_history"):
         logger.error(
@@ -148,17 +152,38 @@ async def _handle_new_step(
     step_num -= 1
     logger.info(f"Step {step_num} completed.")
 
+    #get the current directory
+    #and create a new directory according to the step number
+    current_dir = os.path.dirname(__file__)
+    output_data_dir = os.path.join(current_dir, "..", "..", "outputdata", "step_" + str(step_num))
+    os.makedirs(output_data_dir, exist_ok=True)
+
     # --- Screenshot Handling ---
     screenshot_html = ""
     # Ensure state.screenshot exists and is not empty before proceeding
     # Use getattr for safer access
     screenshot_data = getattr(state, "screenshot", None)
+    # print("\n\n\n\n\n SCREENSHOT DATA: ", screenshot_data, "\n\n\n\n\n")
     if screenshot_data:
         try:
             # Basic validation: check if it looks like base64
             if (
                     isinstance(screenshot_data, str) and len(screenshot_data) > 100
-            ):  # Arbitrary length check
+            ):  
+                # Decode the base64 string
+                image_to_save_locally = screenshot_data = base64.b64decode(screenshot_data)
+
+                #saving the image in the output data directory
+                image_path = os.path.join(output_data_dir, "output_image.png")
+                try:
+                    logger.info(f"Saving image to {image_path}")
+                    with open(image_path, "wb") as f:
+                        f.write(image_to_save_locally)
+                    logger.info(f"\n IMAGE SAVED TO PATH: {image_path}")
+                except Exception as e:
+                    logger.error(f"Error saving image: {e}")                
+                
+                # Arbitrary length check
                 # *** UPDATED STYLE: Removed centering, adjusted width ***
                 img_tag = f'<img src="data:image/jpeg;base64,{screenshot_data}" alt="Step {step_num} Screenshot" style="max-width: 800px; max-height: 600px; object-fit:contain;" />'
                 screenshot_html = (
@@ -186,15 +211,31 @@ async def _handle_new_step(
     step_header = f"--- **Step {step_num}** ---"
     # Combine header, image (with line break), and JSON block
     final_content = step_header + "<br/>" + screenshot_html + formatted_output
+    save_chat = {
+        "evaluation_previous_goal": getattr(output.current_state, "evaluation_previous_goal", ""),
+        "memory": getattr(output.current_state, "memory", ""),
+        "next_goal": getattr(output.current_state, "next_goal", ""),
+    }
 
     chat_message = {
         "role": "assistant",
         "content": final_content.strip(),  # Remove leading/trailing whitespace
     }
 
+    #lets store the formatted output in a file
+    agent_response_path = os.path.join(output_data_dir, "agent_response.json")
+    try:
+        logger.info(f"Saving agent response to {agent_response_path}")
+        with open(agent_response_path, "w") as f:
+            json.dump(save_chat, f)
+            logger.info(f"\n AGENT RESPONSE SAVED TO PATH: {agent_response_path}")
+    except Exception as e:
+        logger.error(f"Error saving agent response: {e}")
+
+
     # Append to the correct chat history list
     webui_manager.bu_chat_history.append(chat_message)
-
+        
     await asyncio.sleep(0.05)
 
 
@@ -269,9 +310,7 @@ async def _ask_assistant_callback(
     )
     return {"response": response}
 
-
 # --- Core Agent Execution Logic --- (Needs access to webui_manager)
-
 
 async def run_agent_task(
         webui_manager: WebuiManager, components: Dict[gr.components.Component, Any]
@@ -307,7 +346,12 @@ async def run_agent_task(
     # --- 1. Get Task and Initial UI Update ---
     task = components.get(user_input_comp, "").strip()
     url = components.get(url_input_comp, "").strip()
-    if not task:
+
+    #lets always make sure that if the task is not empty then it should have the url in it
+    if task:
+        task += f"  url:  {url}"
+
+    else:
         gr.Warning("Please enter a task.")
         yield {run_button_comp: gr.update(interactive=True)}
         return
@@ -342,7 +386,7 @@ async def run_agent_task(
     ollama_num_ctx = get_setting("ollama_num_ctx", 16000)
     use_vision = get_setting("use_vision", False)
     max_actions = get_setting("max_actions_per_step", 5)
-    max_steps = get_setting("max_steps", 100)
+    max_steps = get_setting("max_steps", 25)
     tool_calling_method = get_setting("tool_calling_method", "auto")
     max_input_tokens = get_setting("max_input_tokens", 16000)
     override_system_prompt = get_setting("override_system_prompt") or None
@@ -358,6 +402,26 @@ async def run_agent_task(
         llm_api_key,
         ollama_num_ctx if llm_provider_name == "ollama" else None,
     )
+
+    planner_llm_provider_name = get_setting("planner_llm_provider") or None
+    planner_llm = None
+    planner_use_vision = False
+    if planner_llm_provider_name:
+        planner_llm_model_name = get_setting("planner_llm_model_name")
+        planner_llm_temperature = get_setting("planner_llm_temperature", 0.6)
+        planner_ollama_num_ctx = get_setting("planner_ollama_num_ctx", 16000)
+        planner_llm_base_url = get_setting("planner_llm_base_url") or None
+        planner_llm_api_key = get_setting("planner_llm_api_key") or None
+        planner_use_vision = get_setting("planner_use_vision", False)
+
+        planner_llm = await _initialize_llm(
+            planner_llm_provider_name,
+            planner_llm_model_name,
+            planner_llm_temperature,
+            planner_llm_base_url,
+            planner_llm_api_key,
+            planner_ollama_num_ctx if planner_llm_provider_name == "ollama" else None,
+        )
 
     # --- 4. Browser Settings ---
     def get_browser_setting(key, default=None):
@@ -472,6 +536,7 @@ async def run_agent_task(
         async def step_callback_wrapper(
                 state: BrowserState, output: AgentOutput, step_num: int
         ):
+            # print("\n\n\n\n\n STEP CALLBACK WRAPPER CALLED\n\n\n\n\n")
             await _handle_new_step(webui_manager, state, output, step_num)
 
         def done_callback_wrapper(history: AgentHistoryList):
@@ -500,7 +565,14 @@ async def run_agent_task(
                 max_actions_per_step=max_actions,
                 generate_gif=gif_path,
                 user_query=task,
-                url=url if url else None
+                url=url if url else None,
+                register_new_step_callback = step_callback_wrapper,
+                done_callback_wrapper = done_callback_wrapper,
+                override_system_prompt = override_system_prompt,
+                extend_system_prompt = extend_system_prompt,
+                planner_llm = planner_llm,
+                use_vision_for_planner = planner_use_vision if planner_llm else False,
+                
             )
 
         # --- 7. Run Agent Task and Stream Updates ---

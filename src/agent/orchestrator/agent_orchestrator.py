@@ -47,7 +47,13 @@ class AgentOrchestrator:
         max_actions_per_step: int = 5,
         generate_gif: bool = False,
         user_query: str = "",
-        url: str = ""
+        url: str = "",
+        register_new_step_callback: Any = None,
+        done_callback_wrapper: Any = None,
+        override_system_prompt: Any = None,
+        extend_system_prompt: Any = None,
+        planner_llm: Any = None,
+        use_vision_for_planner: bool = False,
     ):
         self.llm = llm
         self.browser_config = browser_config
@@ -56,6 +62,15 @@ class AgentOrchestrator:
         self.generate_gif = generate_gif
         self.user_query = user_query
         self.url = url
+        self.register_new_step_callback = register_new_step_callback
+        self.done_callback_wrapper = done_callback_wrapper
+        self.override_system_prompt = override_system_prompt
+        self.extend_system_prompt = extend_system_prompt
+        self.planner_llm = planner_llm
+        self.use_vision_for_planner = use_vision_for_planner
+
+
+
         self.builder = StateGraph(State)
 
         self.builder.add_node("intent_classifier", self.intent_classifier)
@@ -177,14 +192,14 @@ class AgentOrchestrator:
                 use_vision=self.use_vision,
                 max_actions_per_step=self.max_actions_per_step,
                 generate_gif=self.generate_gif,
-                register_new_step_callback=None,  # We'll handle this in the run method
-                register_done_callback=None,      # We'll handle this in the run method
-                override_system_message=None,     # Add if needed
-                extend_system_message=None,       # Add if needed
+                register_new_step_callback=self.register_new_step_callback,
+                register_done_callback=self.done_callback_wrapper,      # We'll handle this in the run method
+                override_system_message=self.override_system_prompt,     # Add if needed
+                extend_system_message=self.override_system_prompt,       # Add if needed
                 max_input_tokens=128000,          # Default value
                 tool_calling_method="auto",       # Default value
-                planner_llm=None,                 # Add if needed
-                use_vision_for_planner=False,     # Default value
+                planner_llm=self.planner_llm,                 # Add if needed
+                use_vision_for_planner=self.use_vision_for_planner,     # Default value
                 source="webui"
             )
             
