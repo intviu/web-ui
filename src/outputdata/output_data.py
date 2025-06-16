@@ -1,41 +1,45 @@
 import json
 import os
-import logging
-from pathlib import Path
 import time
-
-logger = logging.getLogger(__name__)
+from pathlib import Path
 
 def write_data_to_file(
     agents_name: str,
-    number_of_tries: str,
-    time_taken: int,
-    user_input: float,
+    number_of_tries: int,
+    time_taken: float,
+    user_input: str,
     output: str
     ) -> None:
+    """
+    Appends agent execution data to agent_execution.json in the outputdata directory.
+    Handles different formats for 'Browser Use Agent' and other agents.
+    """
     try:
         script_dir = Path(__file__).parent
         output_file = script_dir / 'agent_execution.json'
-        
-        # initial_agents = [
-        #     "Intent Classifier Agent",
-        #     "Webpage Checker",
-        #     "Prompt Enhancer Agent",
-        #     "Snippet Extractor Agent",
-        #     "QA POSSIBILTY CHECKER",
-        # ]
+        os.makedirs(script_dir, exist_ok=True)
 
-        # Create new data entry           
+        # Load existing data if file exists
+        if output_file.exists():
+            with open(output_file, 'r') as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    data = []
+        else:
+            data = []
+
+        # Create new data entry
         if agents_name == "Browser Use Agent":
             new_data = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "evaluation": user_input,
+                "evaluation_previous_goal": user_input,
                 "memory": output,
                 "next_goal": agents_name,
-                "actions": json.loads(number_of_tries) if isinstance(number_of_tries, str) else number_of_tries
+                "actions": number_of_tries
             }
         else:
-             new_data = {
+            new_data = {
                 "agents_name": agents_name,
                 "number_of_tries": number_of_tries,
                 "time_taken": time_taken,
@@ -43,26 +47,10 @@ def write_data_to_file(
                 "output": output
             }
 
-        # Read existing data if file exists
-        # existing_data = []
-        # if output_file.exists():
-        #     try:
-        #         with open(output_file, 'r') as f:
-        #             content = f.read()
-        #             if content.strip():  # Check if file is not empty
-        #                 existing_data = json.loads(content)
-        #                 if not isinstance(existing_data, list):
-        #                     existing_data = [existing_data]
-        #     except json.JSONDecodeError:
-        #         existing_data = []
-        
-        # # Append new data
-        # existing_data.append(new_data)
-        
-        # Write back to file
+        data.append(new_data)
+
+        # Write updated data back to file
         with open(output_file, 'a') as f:
-            json.dump(new_data, f, indent=2)
-            f.write("}")
-            
+            json.dump(data, f, indent=2)
     except Exception as e:
         print(f"Error writing data to file: {e}") 
