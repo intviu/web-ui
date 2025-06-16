@@ -1,48 +1,56 @@
 import json
 import os
-import logging
-logger = logging.getLogger(__name__)
+import time
+from pathlib import Path
 
 def write_data_to_file(
     agents_name: str,
-    number_of_tries: str,
-    time_taken: int,
-    user_input: float,
+    number_of_tries: int,
+    time_taken: float,
+    user_input: str,
     output: str
     ) -> None:
-
-    result_data = {
-        "Agent Name": agents_name,
-        "Number of tries": number_of_tries,
-        "TimeTaken": time_taken,
-        "User_input": f"HumanMessage: {user_input}",
-        "Output": f"SystemMessage: {output}",
-    }
-
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(base_dir, "agent_execution.json")
-
-    #reading existing data if file exists, else start a new list
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as f:
-                try:
-                    all_data = json.load(f)
-                    if not isinstance(all_data, list):
-                        all_data = []
-                except json.JSONDecodeError:
-                    all_data = []
-        except Exception as e:
-            logger.error(f"Error reading file {file_path}: {e}")
-            all_data = []
-    else:
-        all_data = []
-
-    all_data.append(result_data)
-
+    """
+    Appends agent execution data to agent_execution.json in the outputdata directory.
+    Handles different formats for 'Browser Use Agent' and other agents.
+    """
     try:
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(all_data, f, indent=4)
-        logger.info(f"Data written to file....")
+        script_dir = Path(__file__).parent
+        output_file = script_dir / 'agent_execution.json'
+        os.makedirs(script_dir, exist_ok=True)
+
+        # Load existing data if file exists
+        if output_file.exists():
+            with open(output_file, 'r') as f:
+                try:
+                    data = json.load(f)
+                except json.JSONDecodeError:
+                    data = []
+        else:
+            data = []
+
+        # Create new data entry
+        if agents_name == "Browser Use Agent":
+            new_data = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "evaluation_previous_goal": user_input,
+                "memory": output,
+                "next_goal": agents_name,
+                "actions": number_of_tries
+            }
+        else:
+            new_data = {
+                "agents_name": agents_name,
+                "number_of_tries": number_of_tries,
+                "time_taken": time_taken,
+                "user_input": user_input,
+                "output": output
+            }
+
+        data.append(new_data)
+
+        # Write updated data back to file
+        with open(output_file, 'a') as f:
+            json.dump(data, f, indent=2)
     except Exception as e:
-        logger.error(f"Error writing to file {file_path}: {e}")
+        print(f"Error writing data to file: {e}") 
