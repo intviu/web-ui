@@ -10,12 +10,13 @@ import tiktoken
 logger = logging.getLogger(__name__)
 
 class SnippetExtractorAgent:
-    def __init__(self, user_prompt: str, url: str) -> None:
+    def __init__(self, llm: str, user_prompt: str, url: str) -> None:
         logger.info("Initializing SnippetExtractorAgent")
         self.output_pydantic_class = SnippetExtractorOutput
         self.user_prompt = user_prompt
         self.agent_prompt = agents_prompt
         self.url = url
+        self.llm = llm
 
     def store_webpage_code(self) -> bool:
         logger.info("Storing webpage code into webpage_code.html under webpage directory....")
@@ -158,7 +159,8 @@ class SnippetExtractorAgent:
                 input_to_prompt={
                     'input': self.user_prompt,
                     'webpage_code': chunk
-                }
+                },
+                model_name=self.llm
             )
             if output.snippet_check:
                 logger.info(f"Snippet found in chunk {i+1}")

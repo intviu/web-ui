@@ -18,14 +18,18 @@ User query: "Verify if the submit form renders correctly on the homepage"
 Output: {{ "intent": true }}
 
 Example 3:
+User query: "please buy this on the website"
+Output: {{ "intent": true }}
+
+Example 4:
 User query: "How do I use OpenAI's API to generate text?"
 Output: {{ "intent": false }}
 
-Example 4:
+Example 5:
 User query: "Can you summarize this PDF document?"
 Output: {{ "intent": false }}
 
-Example 5:
+Example 6:
 User query: "Please test if the color of the button is blue".
 Output:
 {{ 
@@ -33,7 +37,7 @@ agent_msg: "UI elements cannot be tested"
 intent": false 
 }}
 
-Example 5:
+Example 7:
 User query: "Please test the submit button along with the hoover animation".
 Output: 
 {{ 
@@ -46,6 +50,8 @@ intent": true
 
 Now classify the following user query:
 User query: "{input}"
+
+- Always make sure that performing any sought of functionality would also be considered as SQA because user might sometimes just ask simply to do this/that on the website. 
 
 Output Structre:
 Return the result as a JSON object in the following format ONLY:

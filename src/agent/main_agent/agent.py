@@ -5,9 +5,8 @@ import time
 import os
 import logging
 from langchain_openai import ChatOpenAI
+from langchain_ollama.chat_models import ChatOllama
 from dotenv import load_dotenv
-from langchain.prompts import PromptTemplate
-from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate, AIMessagePromptTemplate
 from ...outputdata.output_data import write_data_to_file
 load_dotenv()
@@ -27,17 +26,30 @@ def get_chatprompt_templates(agents_prompt: str, input_keys: list[str]) -> ChatP
         agents_prompt_template,
         user_input_template
     ])
+
+def get_llm_model(
+        model_name: Optional[AIModel],
+        output_pydantic_class
+):
+    if AIModel.Ollama_DeepSeek_14b.value in model_name.model:
+        return ChatOllama(model=AIModel.Ollama_DeepSeek_14b.value).with_structured_output(output_pydantic_class)
     
+    else:
+        #we could specify which model to use here always, for now if not deepseek then just use gpt4-o
+        return ChatOpenAI(model=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
+
+
 def run_main_agent(
     output_pydantic_class,
     agents_name: str,
     agents_prompt: str,
     input_to_prompt: dict,
-    model_name: Optional[AIModel] = AIModel.GPT_4O,
+    model_name: Optional[str],
     ) -> Any:
 
-    llm_model = ChatOpenAI(model_name=model_name.value).with_structured_output(output_pydantic_class)
-    logger.info(f"Running agent '{agents_name}' with model: {model_name.value}")
+    llm_model = get_llm_model(model_name, output_pydantic_class)
+
+    logger.info(f"Running agent '{agents_name}' with model: {model_name}")
     
     chat_prompt = get_chatprompt_templates(agents_prompt, list(input_to_prompt.keys()))
   

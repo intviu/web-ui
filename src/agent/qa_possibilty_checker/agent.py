@@ -6,12 +6,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 class QAPossibilityChecker:
-    def __init__(self, user_prompt: str, extracted_snippet: str) -> None:
+    def __init__(self, llm: str, user_prompt: str, extracted_snippet: str) -> None:
         logger.info("Initializing QAPossibilityChecker")
         self.output_pydantic_class = QAPossibiltyChecker
         self.user_prompt = user_prompt
         self.agent_prompt = agents_prompt
         self.extracted_snippet = extracted_snippet
+        self.llm = llm
 
     def run_agent(self) -> QAPossibiltyChecker:
 
@@ -22,7 +23,8 @@ class QAPossibilityChecker:
             input_to_prompt={
                 "input": self.user_prompt,
                 "extracted_snippet": self.extracted_snippet
-            }
+            },
+            model_name=self.llm
         )
         
         logger.info(f"QA Possibilty Checker finished Output...: {output}")

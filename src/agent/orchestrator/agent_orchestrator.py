@@ -69,8 +69,6 @@ class AgentOrchestrator:
         self.planner_llm = planner_llm
         self.use_vision_for_planner = use_vision_for_planner
 
-
-
         self.builder = StateGraph(State)
 
         self.builder.add_node("intent_classifier", self.intent_classifier)
@@ -151,15 +149,26 @@ class AgentOrchestrator:
 
     async def snippet_extractor(self, state: State) -> State:
         logger.info("\n\n SNIPPET EXTRACTOR NODE...\n")
-        output = await SnippetExtractorAgent(user_prompt=self.user_query, url=self.url).run_agent()
+        
+        output = await SnippetExtractorAgent(
+            llm=self.llm, 
+            user_prompt=self.user_query, 
+            url=self.url
+            
+            ).run_agent()
         state['extracted_snippet_agent_msg'] = self._get_output_value(output, "agent_msg", "")
         state['snippet_check'] = self._get_output_value(output, "snippet_check", False)
         state['extracted_snippet'] = self._get_output_value(output, "extracted_snippet", "")
+
+        print("\n\n\n EXTRACTED SNIPPET: ", output.extracted_snippet)
+
+        
         return state
 
     def QA_possibility(self, state: State) -> State:
         logger.info("\n\n QA POSSIBILTY CHECKER AGENT...\n")
         output = QAPossibilityChecker(
+            llm=self.llm,
             user_prompt=self.user_query,
             extracted_snippet=state['extracted_snippet']
         ).run_agent()
@@ -170,6 +179,7 @@ class AgentOrchestrator:
     def prompt_enhancer(self, state: State) -> State:
         logger.info("\n\n PROMPT ENHANCER AGENT...\n")
         output = PromptEnhancerAgent(
+            llm=self.llm,
             user_prompt=self.user_query,
             extracted_snippet=state['extracted_snippet']
         ).run_agent()
