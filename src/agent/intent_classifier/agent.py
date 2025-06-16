@@ -24,7 +24,8 @@ class IntentClassifierAgent:
             agents_prompt=self.agent_prompt,
             input_to_prompt={
                 "input": self.user_prompt
-            }
+            },
+            model_name=self.llm
         )
         
         logger.info(f"Intent Classifier Agent finished. Output: {output}")
