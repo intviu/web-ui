@@ -33,10 +33,11 @@ def get_llm_model(
 ):
     if AIModel.Ollama_DeepSeek_14b.value in model_name.model:
         return ChatOllama(model=AIModel.Ollama_DeepSeek_14b.value).with_structured_output(output_pydantic_class)
-    
+    elif AIModel.Ollama_Gemma_7b.value in model_name.model:
+        return ChatOllama(model=AIModel.Ollama_Gemma_7b.value).with_structured_output(output_pydantic_class)
     else:
         #we could specify which model to use here always, for now if not deepseek then just use gpt4-o
-        return ChatOpenAI(model=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
+        return ChatOpenAI(model_name=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
 
 
 def run_main_agent(
