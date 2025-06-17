@@ -7,7 +7,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TypedDict
 
-#from browser_use.browser.browser import BrowserConfig
 from browser_use.browser import BrowserProfile, BrowserSession
 from browser_use.browser.profile import ViewportSize
 from langchain_community.tools.file_management import (
@@ -31,10 +30,7 @@ from langchain_core.tools import StructuredTool, Tool
 from langgraph.graph import StateGraph
 from pydantic import BaseModel, Field
 
-#from browser_use.browser.context import BrowserContextConfig
-
 from src.agent.browser_use.browser_use_agent import BrowserUseAgent
-#from src.browser.custom_browser import CustomBrowser
 from src.controller.custom_controller import CustomController
 from src.utils.mcp_client import setup_mcp_client_and_tools
 
@@ -99,7 +95,7 @@ async def run_single_browser_task(
             record_video_dir=None,
             downloads_path="./tmp/downloads"
         )
-        browser_session = BrowserSession(
+        bu_browser_session = BrowserSession(
             browser_profile=browser_profile,
             wss_url=wss_url,
             cdp_url=cdp_url)
@@ -123,7 +119,7 @@ async def run_single_browser_task(
         bu_agent_instance = BrowserUseAgent(
             task=bu_task_prompt,
             llm=llm,  # Use the passed LLM
-            browser_session=browser_session,
+            browser_session=bu_browser_session,
             controller=bu_controller,
             use_vision=use_vision,
             source="webui",

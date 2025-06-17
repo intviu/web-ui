@@ -25,18 +25,10 @@ async def test_browser_use_agent():
     from src.utils import llm_provider
     from src.agent.browser_use.browser_use_agent import BrowserUseAgent
 
-    #llm = llm_provider.get_llm_model(
-    #    provider="openai",
-    #    model_name="gpt-4o",
-    #    temperature=0.8,
-    #)
-
     llm = llm_provider.get_llm_model(
         provider="openai",
-        model_name="meta-llama/llama-4-scout-17b-16e-instruct",
+        model_name="gpt-4o",
         temperature=0.8,
-        base_url="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY", ""),
     )
 
     # llm = llm_provider.get_llm_model(
@@ -151,25 +143,20 @@ async def test_browser_use_agent():
 
 
 async def test_browser_use_parallel():
-    #from browser_use.browser.browser import Browser, BrowserConfig
     from browser_use.browser import BrowserProfile, BrowserSession
-    #from browser_use.browser.context import (
-    #    BrowserContextConfig,
-    #)
     from browser_use.agent.service import Agent
 
-    #from src.browser.custom_browser import CustomBrowser
     from src.controller.custom_controller import CustomController
     from src.utils import llm_provider
     from src.agent.browser_use.browser_use_agent import BrowserUseAgent
 
-    # llm = utils.get_llm_model(
-    #     provider="openai",
-    #     model_name="gpt-4o",
-    #     temperature=0.8,
-    #     base_url=os.getenv("OPENAI_ENDPOINT", ""),
-    #     api_key=os.getenv("OPENAI_API_KEY", ""),
-    # )
+    llm = utils.get_llm_model(
+        provider="openai",
+        model_name="gpt-4o",
+        temperature=0.8,
+        base_url=os.getenv("OPENAI_ENDPOINT", ""),
+        api_key=os.getenv("OPENAI_API_KEY", ""),
+    )
 
     # llm = utils.get_llm_model(
     #     provider="google",
@@ -208,14 +195,6 @@ async def test_browser_use_parallel():
     #    api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
     #)
 
-    llm = llm_provider.get_llm_model(
-        provider="openai",
-        model_name="meta-llama/llama-4-scout-17b-16e-instruct",
-        temperature=0.8,
-        base_url="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY", ""),
-    )
-
     mcp_server_config = {
         "mcpServers": {
             # "markitdown": {
@@ -250,8 +229,6 @@ async def test_browser_use_parallel():
     use_vision = True  # Set to False when using DeepSeek
 
     max_actions_per_step = 10
-    browser = None
-    browser_context = None
     browser_session = None
     try:
         browser_user_data = None
@@ -313,19 +290,10 @@ async def test_deep_research_agent():
     from src.agent.deep_research.deep_research_agent import DeepResearchAgent, PLAN_FILENAME, REPORT_FILENAME
     from src.utils import llm_provider
 
-    #this one
-    #llm = llm_provider.get_llm_model(
-    #    provider="openai",
-    #    model_name="gpt-4o",
-    #    temperature=0.5
-    #)
-
     llm = llm_provider.get_llm_model(
         provider="openai",
-        model_name="meta-llama/llama-4-maverick-17b-128e-instruct",
-        temperature=0.2,
-        base_url="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY", ""),
+        model_name="gpt-4o",
+        temperature=0.5
     )
 
     # llm = llm_provider.get_llm_model(
@@ -387,6 +355,6 @@ async def test_deep_research_agent():
 
 
 if __name__ == "__main__":
-    # asyncio.run(test_browser_use_agent())
+    asyncio.run(test_browser_use_agent())
     # asyncio.run(test_browser_use_parallel())
-    asyncio.run(test_deep_research_agent())
+    # asyncio.run(test_deep_research_agent())
