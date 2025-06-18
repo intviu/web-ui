@@ -10,6 +10,9 @@ Analyse the user prompt and the extracted webpage snippet and classify if the QA
 ' User prompt (QA prompt) ': {user_prompt}
 ' Extracte Web Page Snippet ': ' {extracted_snippet} '
 
+
+Also you stay a little lenient, do not say very rigid.
+
 Output Structure:
 return the result as a JSON object in the following format ONLY:
 { 

@@ -26,6 +26,7 @@ from src.webui.webui_manager import WebuiManager
 from src.agent.orchestrator.agent_orchestrator import AgentOrchestrator
 import base64
 import os
+from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,13 @@ async def _handle_new_step(
     webui_manager.bu_chat_history.append(chat_message)
         
     await asyncio.sleep(0.05)
+
+    # Check if video recording is active
+    if hasattr(webui_manager.bu_browser, 'recorder'):
+        if webui_manager.bu_browser.recorder.is_video_recording():
+            logger.info("🎥 Video recording is active")
+        else:
+            logger.warning("⚠️ Video recording is not active!")
 
 
 def _handle_done(webui_manager: WebuiManager, history: AgentHistoryList):
@@ -494,6 +502,10 @@ async def run_agent_task(
                     )
                 )
             )
+            
+            # Initialize the browser and keep playwright instance alive
+            webui_manager.bu_playwright = await async_playwright().start()
+            webui_manager.bu_browser.playwright_browser = await webui_manager.bu_browser._setup_builtin_browser(webui_manager.bu_playwright)
 
         # Create Context if needed
         if not webui_manager.bu_browser_context:
@@ -507,9 +519,15 @@ async def run_agent_task(
             )
             if not webui_manager.bu_browser:
                 raise ValueError("Browser not initialized, cannot create context.")
+            
             webui_manager.bu_browser_context = (
                 await webui_manager.bu_browser.new_context(config=context_config)
             )
+
+            print("\n\n\n\n RECORD VIDEO.....................`: \n\n\n\n")
+            logger.info("Setting up browser context with video recording...")
+            await webui_manager.bu_browser_context.setup()
+            logger.info("Browser context setup complete with video recording enabled")
 
         # Initialize controller if needed
         if not webui_manager.bu_controller:
@@ -590,6 +608,36 @@ async def run_agent_task(
             history = await agent_task
             logger.info("Agent task finished.")
             
+            # Force close browser and save videos
+            if webui_manager.bu_browser_context:
+                logger.info("Task completed - Saving videos and closing browser...")
+                try:
+                    # Save videos first
+                    video_paths = await webui_manager.bu_browser_context.save_videos()
+                    if video_paths:
+                        for path in video_paths:
+                            logger.info(f"Video recording saved to: {path}")
+                    else:
+                        logger.warning("No video recordings found to save")
+                        
+                    # Force close everything
+                    logger.info("Closing browser context after task.")
+                    await webui_manager.bu_browser_context.close()
+                    webui_manager.bu_browser_context = None
+                    
+                    if webui_manager.bu_browser:
+                        logger.info("Closing browser after task.")
+                        await webui_manager.bu_browser.close()
+                        webui_manager.bu_browser = None
+                        
+                    if webui_manager.bu_playwright:
+                        logger.info("Closing playwright after task.")
+                        await webui_manager.bu_playwright.stop()
+                        webui_manager.bu_playwright = None
+                        
+                except Exception as e:
+                    logger.error(f"Error during cleanup: {e}")
+            
             # Save history to file
             with open(history_file, "w") as f:
                 json.dump(history.dict(), f, indent=2)
@@ -627,18 +675,8 @@ async def run_agent_task(
             gr.Error(f"Agent execution failed: {e}")
 
         finally:
-            webui_manager.bu_current_task = None  # Clear the task reference
-
-            # Close browser/context if requested
-            if should_close_browser_on_finish:
-                if webui_manager.bu_browser_context:
-                    logger.info("Closing browser context after task.")
-                    await webui_manager.bu_browser_context.close()
-                    webui_manager.bu_browser_context = None
-                if webui_manager.bu_browser:
-                    logger.info("Closing browser after task.")
-                    await webui_manager.bu_browser.close()
-                    webui_manager.bu_browser = None
+            # Just clear the current task reference
+            webui_manager.bu_current_task = None
 
     except Exception as e:
         # Catch errors during setup (before agent run starts)

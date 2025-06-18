@@ -28,16 +28,22 @@ def get_chatprompt_templates(agents_prompt: str, input_keys: list[str]) -> ChatP
     ])
 
 def get_llm_model(
-        model_name: Optional[AIModel],
+        model_name: Any,
         output_pydantic_class
-):
-    if AIModel.Ollama_DeepSeek_14b.value in model_name.model:
-        return ChatOllama(model=AIModel.Ollama_DeepSeek_14b.value).with_structured_output(output_pydantic_class)
-    elif AIModel.Ollama_Gemma_7b.value in model_name.model:
-        return ChatOllama(model=AIModel.Ollama_Gemma_7b.value).with_structured_output(output_pydantic_class)
-    else:
-        #we could specify which model to use here always, for now if not deepseek then just use gpt4-o
-        return ChatOpenAI(model_name=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
+) -> ChatOllama | ChatOpenAI:
+    
+    if isinstance(model_name, dict):
+        if AIModel.Ollama_DeepSeek_14b.value in model_name.model:
+            return ChatOllama(model=AIModel.Ollama_DeepSeek_14b.value).with_structured_output(output_pydantic_class)
+        elif AIModel.Ollama_Gemma_7b.value in model_name.model:
+            return ChatOllama(model=AIModel.Ollama_Gemma_7b.value).with_structured_output(output_pydantic_class)
+        else:
+            #we could specify which model to use here always, for now if not deepseek then just use gpt4-o
+            return ChatOpenAI(model_name=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
+        
+
+    #if the model is not an instance of dict, then we can assume that it is a string and return just gpt40
+    return ChatOpenAI(model_name=AIModel.GPT_4O.value).with_structured_output(output_pydantic_class)
 
 
 def run_main_agent(

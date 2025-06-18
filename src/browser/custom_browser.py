@@ -27,11 +27,16 @@ from browser_use.utils import time_execution_async
 import socket
 
 from .custom_context import CustomBrowserContext
+from .browser_recorder import BrowserRecorder
 
 logger = logging.getLogger(__name__)
 
 
 class CustomBrowser(Browser):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.recorder = BrowserRecorder()
 
     async def new_context(self, config: BrowserContextConfig | None = None) -> CustomBrowserContext:
         """Create a browser context"""
@@ -98,6 +103,9 @@ class CustomBrowser(Browser):
             ],
         }
 
+        logger.info("\n\n LAUNCHING THE BROWSER...")
+
+        # Launch browser with original settings
         browser = await browser_class.launch(
             channel='chromium',  # https://github.com/microsoft/playwright/issues/33566
             headless=self.config.headless,
@@ -106,4 +114,16 @@ class CustomBrowser(Browser):
             handle_sigterm=False,
             handle_sigint=False,
         )
+
+        # Set up video recording before returning browser
+        logger.info("\n🎬 Setting up browser with video recording...")
+        self.playwright_browser = browser
+        
+        # Initialize recording
+        try:
+            await self.recorder.setup_recording(browser)
+            logger.info("✅ Browser ready with video recording enabled")
+        except Exception as e:
+            logger.error(f"⚠️ Video recording setup failed: {str(e)}")
+
         return browser
