@@ -58,8 +58,8 @@ def create_browser_settings_tab(webui_manager: WebuiManager):
             )
             keep_browser_open = gr.Checkbox(
                 label="Keep Browser Open",
-                value=bool(strtobool(os.getenv("KEEP_BROWSER_OPEN", "true"))),
-                info="Keep Browser Open between Tasks",
+                value=bool(strtobool(os.getenv("KEEP_BROWSER_OPEN", "false"))),
+                info="Keep Browser Open between Tasks (if unchecked, browser will close after each task)",
                 interactive=True
             )
             headless = gr.Checkbox(
