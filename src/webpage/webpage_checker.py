@@ -11,7 +11,21 @@ class WebpageChecker:
     def exists(self):
         try:
             logger.info(f"Checking if the webpage {self.url} exists...")
-            response = requests.head(self.url, allow_redirects=True, timeout=5)
+
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/114.0.0.0 Safari/537.36"
+            }
+
+            # Try HEAD request first
+            response = requests.head(self.url, headers=headers, allow_redirects=True, timeout=15)
+
+            # If HEAD gives 403 or isn't reliable, fallback to GET
+            if response.status_code == 403 or response.status_code >= 400:
+                logger.warning(f"HEAD request got status {response.status_code}, trying GET instead...")
+                response = requests.get(self.url, headers=headers, allow_redirects=True, timeout=15)
+
             write_data_to_file(
                 agents_name="Webpage Checker",
                 number_of_tries=1,
@@ -19,7 +33,10 @@ class WebpageChecker:
                 user_input=self.url,
                 output=f"{response.status_code} - {response.reason}"
             )
-            return True if response.status_code == 200 else False
+
+            logger.info(f"Response: {response.status_code} - {response.reason}")
+            return response.status_code == 200
+
         except requests.RequestException as e:
             logger.error("Error checking URL: %s", e)
             return False
