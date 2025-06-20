@@ -19,7 +19,8 @@ We implemented dynamic registration of custom skills as controller actions to en
    ```python
    # This allows JSON scenarios to call actions like "goto", "clickCss", etc.
    from src.custom_skills import CUSTOM_SKILLS
-   from typing import Any
+   from typing import Any, Dict
+   from playwright.async_api import BrowserContext
 
    for _skill_name, _skill_func in CUSTOM_SKILLS.items():
        # Create a wrapper that adapts the controller action signature

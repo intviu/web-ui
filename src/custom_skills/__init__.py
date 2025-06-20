@@ -70,10 +70,10 @@ async def wait_for_skill(ctx, args: List[Any]) -> Dict[str, Any]:
     try:
         if state == 'detached':
             # Wait for element to be removed from DOM
-            await ctx.page.wait_for_selector(selector, state='hidden', timeout=timeout/1000)
+            await ctx.page.wait_for_selector(selector, state='detached', timeout=timeout)
         else:
             # Wait for element to be in specified state
-            await ctx.page.wait_for_selector(selector, state=state, timeout=timeout/1000)
+            await ctx.page.wait_for_selector(selector, state=state, timeout=timeout)
         
         return {"status": "success", "message": f"Element {selector} reached state {state}"}
     except Exception as e:
@@ -98,7 +98,7 @@ async def wait_for_url_skill(ctx, args: List[Any]) -> Dict[str, Any]:
     try:
         await ctx.page.wait_for_url(
             f"*{url_fragment}*",
-            timeout=timeout/1000,
+            timeout=timeout,
             wait_until="networkidle"
         )
         return {"status": "success", "message": f"URL contains {url_fragment}"}
