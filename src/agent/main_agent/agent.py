@@ -96,7 +96,7 @@ def run_main_agent(
         number_of_tries=MAX_TRIES,
         time_taken=time_taken,
         user_input=input_to_prompt,
-        output=output
+        output=output.model_dump()
     )
     
     # print("\n\n\n\n OUTPOUT: ", output , "\n\n\n\n")

@@ -5,41 +5,47 @@ from pathlib import Path
 
 def write_data_to_file(
     agents_name: str,
-    number_of_tries: int,
-    time_taken: float,
-    user_input: str,
-    output: str
-    ) -> None:
-    """
-    Appends agent execution data to agent_execution.json in the outputdata directory.
-    Handles different formats for 'Browser Use Agent' and other agents.
-    """
+    number_of_tries: int = 1,
+    time_taken: float = 0.0,
+    user_input=None,
+    output=None,
+    evaluation=None,
+    memory=None,
+    next_goal=None,
+    actions=None,
+    final_result=None
+) -> None:
     try:
         script_dir = Path(__file__).parent
         output_file = script_dir / 'agent_execution.json'
         os.makedirs(script_dir, exist_ok=True)
 
-        # Load existing data if file exists
+        # Read existing data safely
         if output_file.exists():
-            with open(output_file, 'r') as f:
+            with open(output_file, 'r', encoding='utf-8') as f:
                 try:
                     data = json.load(f)
+                    if not isinstance(data, list):
+                        data = []
                 except json.JSONDecodeError:
                     data = []
         else:
             data = []
 
-        # Create new data entry
+        # Construct new entry
         if agents_name == "Browser Use Agent":
-            new_data = {
+            new_entry = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "evaluation_previous_goal": user_input,
-                "memory": output,
-                "next_goal": agents_name,
-                "actions": number_of_tries
+                "agents_name": agents_name,
+                "evaluation": evaluation,
+                "memory": memory,
+                "next_goal": next_goal,
+                "actions": actions,
+                "final_result": final_result
             }
         else:
-            new_data = {
+            new_entry = {
+                "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                 "agents_name": agents_name,
                 "number_of_tries": number_of_tries,
                 "time_taken": time_taken,
@@ -47,10 +53,11 @@ def write_data_to_file(
                 "output": output
             }
 
-        data.append(new_data)
+        data.append(new_entry)
 
-        # Write updated data back to file
-        with open(output_file, 'a') as f:
+        # Write entire list back safely
+        with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
+
     except Exception as e:
-        print(f"Error writing data to file: {e}") 
+        print(f"❌ Error writing data to file: {e}")
