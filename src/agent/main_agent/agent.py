@@ -99,6 +99,4 @@ def run_main_agent(
         output=output.model_dump()
     )
     
-    # print("\n\n\n\n OUTPOUT: ", output , "\n\n\n\n")
-    logger.info(f"Agent '{agents_name}' execution data written to agent_execution.json")
     return output

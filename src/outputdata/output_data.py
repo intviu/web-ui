@@ -32,7 +32,7 @@ def write_data_to_file(
         else:
             data = []
 
-        # Construct new entry
+        #construct new entry
         if agents_name == "Browser Use Agent":
             new_entry = {
                 "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -55,7 +55,7 @@ def write_data_to_file(
 
         data.append(new_entry)
 
-        # Write entire list back safely
+        #Write entire list back safely
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=2)
 
