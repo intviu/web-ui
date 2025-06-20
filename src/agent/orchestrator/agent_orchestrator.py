@@ -22,6 +22,7 @@ class State(TypedDict):
 
     intent_check: bool
     intent_agent_msg: str
+    prompt_without_ui: str
 
     webpage_check: bool
     webpage_msg: str
@@ -127,6 +128,14 @@ class AgentOrchestrator:
         output = IntentClassifierAgent(llm=self.llm, user_prompt=self.user_query).run_agent()
         state["intent_check"] = output.intent
         state["intent_agent_msg"] = output.agent_msg
+
+        new_intent_prompt = self._get_output_value(output, "modified_prompt", "")
+        if new_intent_prompt:
+            logger.info(f"Modified user query: {new_intent_prompt}")
+            state["prompt_without_ui"] = new_intent_prompt
+        else:
+            logger.info("No modifications made to the user query.")
+        
         return state
 
     def webpage_checker(self, state: State) -> State:
@@ -150,9 +159,11 @@ class AgentOrchestrator:
     async def snippet_extractor(self, state: State) -> State:
         logger.info("\n\n SNIPPET EXTRACTOR NODE...\n")
         
+        #either select the user query or the modified prompt if available
+        user_prompt = state.get("prompt_without_ui", self.user_query)
         output = await SnippetExtractorAgent(
             llm=self.llm, 
-            user_prompt=self.user_query, 
+            user_prompt=user_prompt, 
             url=self.url
             
             ).run_agent()
@@ -167,9 +178,11 @@ class AgentOrchestrator:
 
     def QA_possibility(self, state: State) -> State:
         logger.info("\n\n QA POSSIBILTY CHECKER AGENT...\n")
+
+        user_prompt = state.get("prompt_without_ui", self.user_query)
         output = QAPossibilityChecker(
             llm=self.llm,
-            user_prompt=self.user_query,
+            user_prompt=user_prompt,
             extracted_snippet=state['extracted_snippet']
         ).run_agent()
         state["QA_possibility_agent_msg"] = output.agent_msg
@@ -178,9 +191,11 @@ class AgentOrchestrator:
 
     def prompt_enhancer(self, state: State) -> State:
         logger.info("\n\n PROMPT ENHANCER AGENT...\n")
+
+        user_prompt = state.get("prompt_without_ui", self.user_query)
         output = PromptEnhancerAgent(
             llm=self.llm,
-            user_prompt=self.user_query,
+            user_prompt=user_prompt,
             extracted_snippet=state['extracted_snippet']
         ).run_agent()
         state['enhanced_prompt_agent_msg'] = output.agent_msg

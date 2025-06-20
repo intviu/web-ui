@@ -58,6 +58,7 @@ Return the result as a JSON object in the following format ONLY:
 { 
     "agent_msg": "The intent is realted to QA"
     "intent": true 
+    "prompt": new prompt without the UI or animation testing or just nothing like this ""
 } 
 or 
 {

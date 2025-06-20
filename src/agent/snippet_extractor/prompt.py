@@ -162,9 +162,11 @@ Webpage Code: " {webpage_code} "
 
 - Alwyas make sure only to extract the correct element according to the user prompt.
 
-If user asks to extract a particular button, extract only that paticular button, if an image, extract that image, if a form, extract that form, if a product only extract that product, if anything else, only extract that particular thing only.
+- If user asks to extract a particular button, extract only that paticular button, if an image, extract that image, if a form, extract that form, if a product only extract that product, if anything else, only extract that particular thing only.
 
-In some cases, there are elements that are clickable as well, for instance and Image or product might be clickable e.t.c. so you can extract the proper element that also shows this picture or anything is clickable e.t.c.
+- In some cases, there are elements that are clickable as well, for instance and Image or product might be clickable e.t.c. so you can extract the proper element that also shows this picture or anything is clickable e.t.c.
+
+- Pleasen always make sure to extract the correct snippet and also wait because you would be getting a lot of chunks, always extract the correct snippet
 
 Output format:
 
