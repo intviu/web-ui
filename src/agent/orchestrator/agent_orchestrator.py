@@ -94,7 +94,7 @@ class AgentOrchestrator:
             "webpage_checker",
             self._webpage_condition,
             {
-                "snippet_extractor": "QA_possibility",
+                "QA_possibility": "QA_possibility",
                 "__end__": END
             }
         )
