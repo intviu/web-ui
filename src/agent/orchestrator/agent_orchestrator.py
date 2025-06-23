@@ -10,6 +10,9 @@ from src.agent.snippet_extractor.agent import SnippetExtractorAgent
 from src.agent.qa_possibilty_checker.agent import QAPossibilityChecker
 from src.agent.prompt_enahncer.agent import PromptEnhancerAgent
 from src.agent.browser_use.browser_use_agent import BrowserUseAgent
+import asyncio
+from playwright.async_api import async_playwright
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +29,9 @@ class State(TypedDict):
 
     webpage_check: bool
     webpage_msg: str
+
+    screenshot_taken: bool
+    image_fileId: str
 
     extracted_snippet_agent_msg: str
     extracted_snippet: str
@@ -69,12 +75,15 @@ class AgentOrchestrator:
         self.extend_system_prompt = extend_system_prompt
         self.planner_llm = planner_llm
         self.use_vision_for_planner = use_vision_for_planner
+        self.client = OpenAI()
 
         self.builder = StateGraph(State)
 
         self.builder.add_node("intent_classifier", self.intent_classifier)
         self.builder.add_node("webpage_checker", self.webpage_checker)
         # self.builder.add_node("snippet_extractor", self.snippet_extractor)
+        self.builder.add_node("take_screenshot", self.take_screenshot)
+        self.builder.add_node("get_image_fileId", self.get_image_fileId)
         self.builder.add_node("QA_possibility", self.QA_possibility)
         self.builder.add_node("prompt_enhancer", self.prompt_enhancer)
         self.builder.add_node("browser_ui", self.browser_ui)
@@ -94,19 +103,27 @@ class AgentOrchestrator:
             "webpage_checker",
             self._webpage_condition,
             {
-                "QA_possibility": "QA_possibility",
+                "take_screenshot": "take_screenshot",
                 "__end__": END
             }
         )
 
-        # self.builder.add_conditional_edges(
-        #     "snippet_extractor",
-        #     self._snippet_condition,
-        #     {
-        #         "QA_possibility": "QA_possibility",
-        #         "__end__": END
-        #     }
-        # )
+        self.builder.add_conditional_edges(
+            "take_screenshot",
+            self._take_screenshot_condition,
+            {
+                "get_image_fileId": "get_image_fileId",
+                "__end__": END
+            }
+        )
+        self.builder.add_conditional_edges(
+            "get_image_fileId",
+            self._get_image_fileId_condition,
+            {
+                "QA_possibility": "QA_possibility",
+                "__end__": END
+            }
+        )
 
         self.builder.add_conditional_edges(
             "QA_possibility",
@@ -156,25 +173,47 @@ class AgentOrchestrator:
             return output.get(key, default)
         return getattr(output, key, default)
 
-    # async def snippet_extractor(self, state: State) -> State:
-    #     logger.info("\n\n SNIPPET EXTRACTOR NODE...\n")
-        
-    #     #either select the user query or the modified prompt if available
-    #     user_prompt = state.get("prompt_without_ui", self.user_query)
-    #     output = await SnippetExtractorAgent(
-    #         llm=self.llm, 
-    #         user_prompt=user_prompt, 
-    #         url=self.url
-            
-    #         ).run_agent()
-    #     state['extracted_snippet_agent_msg'] = self._get_output_value(output, "agent_msg", "")
-    #     state['snippet_check'] = self._get_output_value(output, "snippet_check", False)
-    #     state['extracted_snippet'] = self._get_output_value(output, "extracted_snippet", "")
 
-    #     print("\n\n\n EXTRACTED SNIPPET: ", output.extracted_snippet)
+    async def take_screenshot(self, state: State) -> State:
 
-        
-        # return state
+        save_path = "screenshot.png"
+        try:
+            logger.info("Taking screenshot...")
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                page = await browser.new_page()
+                await page.goto(self.url, timeout=60000, wait_until="networkidle")
+                
+                #await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(1)
+
+                #scroll multiple times for infinite scrolling pages
+                for _ in range(6):
+                    await page.mouse.wheel(0, 1000)
+                    await asyncio.sleep(1)
+
+                await page.screenshot(path=save_path, full_page=True)
+                await browser.close()
+                logger.info(f"Screenshot saved at: {save_path}")
+                
+                state["screenshot_taken"] = True
+        except Exception as e:
+            logger.error(f"Error taking screenshot: {e}")
+            state["screenshot_taken"] = False
+
+        return state    
+    
+    def get_image_fileId(self, state: State) -> State:
+        logger.info("Extracting image file ID...")
+        try:
+            with open("screenshot.png", "rb") as image_file:
+                image_file_id = self.client.files.create(file=image_file, purpose="vision").id
+                logger.info(f"Image file ID extracted: {image_file_id}")
+                state["image_fileId"] = image_file_id
+        except Exception as e:
+            logger.error(f"Error extracting base64 image: {e}")
+            state["image_fileId"] = ""
+        return state
 
     def QA_possibility(self, state: State) -> State:
         logger.info("\n\n QA POSSIBILTY CHECKER AGENT...\n")
@@ -183,7 +222,7 @@ class AgentOrchestrator:
         output = QAPossibilityChecker(
             llm=self.llm,
             user_prompt=user_prompt,
-            url=self.url,
+            image_file_id=state["image_fileId"],
         ).run_agent()
         state["QA_possibility_agent_msg"] = output.agent_msg
         state["QA_possibility_check"] = output.qa_possibility
@@ -196,7 +235,7 @@ class AgentOrchestrator:
         output = PromptEnhancerAgent(
             llm=self.llm,
             user_prompt=user_prompt,
-            extracted_snippet=state['extracted_snippet']
+            image_file_id=state['image_fileId']
         ).run_agent()
         state['enhanced_prompt_agent_msg'] = output.agent_msg
         state['enhanced_prompt'] = output.enhanced_prompt
@@ -244,10 +283,13 @@ class AgentOrchestrator:
         return "webpage_checker" if state.get("intent_check") else END
 
     def _webpage_condition(self, state: State) -> Any:
-        return "snippet_extractor" if state.get("webpage_check") else END
+        return "take_screenshot" if state.get("webpage_check") else END
 
-    def _snippet_condition(self, state: State) -> Any:
-        return "QA_possibility" if state.get("snippet_check") else END
+    def _take_screenshot_condition(self, state: State) -> Any:
+        return "get_image_fileId" if state.get("screenshot_taken") else END
+    
+    def _get_image_fileId_condition(self, state: State) -> Any:
+        return "QA_possibility" if state.get("image_fileId") else END
 
     def _QA_possibility_condition(self, state: State) -> Any:
         return "prompt_enhancer" if state.get("QA_possibility_check") else END

@@ -6,12 +6,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 class PromptEnhancerAgent:
-    def __init__(self,llm: str, user_prompt: str, extracted_snippet: str) -> None:
+    def __init__(self,llm: str, user_prompt: str, image_file_id: str) -> None:
         logger.info("Initializing PromptEnhancerAgent...")
         self.output_pydantic_class = PromptEnhancerOutput
         self.user_prompt = user_prompt
         self.agent_prompt = agents_prompt
-        self.extracted_snippet = extracted_snippet
+        self.image_file_id = image_file_id
         self.llm = llm
 
     def run_agent(self) -> PromptEnhancerOutput:        
@@ -21,7 +21,7 @@ class PromptEnhancerAgent:
             agents_prompt=self.agent_prompt,
             input_to_prompt={
                 "input": self.user_prompt,
-                "extracted_snippet": self.extracted_snippet
+                "image_file_id": self.image_file_id
             },
              model_name=self.llm
         )
