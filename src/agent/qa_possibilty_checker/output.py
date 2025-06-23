@@ -1,5 +1,5 @@
 from pydantic import BaseModel
 
-class QAPossibiltyChecker(BaseModel):
+class QAPossibilityCheckerOutput(BaseModel):
     agent_msg: str
-    qa_possibilty: bool
+    qa_possibility: bool

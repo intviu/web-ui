@@ -74,7 +74,7 @@ class AgentOrchestrator:
 
         self.builder.add_node("intent_classifier", self.intent_classifier)
         self.builder.add_node("webpage_checker", self.webpage_checker)
-        self.builder.add_node("snippet_extractor", self.snippet_extractor)
+        # self.builder.add_node("snippet_extractor", self.snippet_extractor)
         self.builder.add_node("QA_possibility", self.QA_possibility)
         self.builder.add_node("prompt_enhancer", self.prompt_enhancer)
         self.builder.add_node("browser_ui", self.browser_ui)
@@ -94,19 +94,19 @@ class AgentOrchestrator:
             "webpage_checker",
             self._webpage_condition,
             {
-                "snippet_extractor": "snippet_extractor",
+                "snippet_extractor": "QA_possibility",
                 "__end__": END
             }
         )
 
-        self.builder.add_conditional_edges(
-            "snippet_extractor",
-            self._snippet_condition,
-            {
-                "QA_possibility": "QA_possibility",
-                "__end__": END
-            }
-        )
+        # self.builder.add_conditional_edges(
+        #     "snippet_extractor",
+        #     self._snippet_condition,
+        #     {
+        #         "QA_possibility": "QA_possibility",
+        #         "__end__": END
+        #     }
+        # )
 
         self.builder.add_conditional_edges(
             "QA_possibility",
@@ -156,25 +156,25 @@ class AgentOrchestrator:
             return output.get(key, default)
         return getattr(output, key, default)
 
-    async def snippet_extractor(self, state: State) -> State:
-        logger.info("\n\n SNIPPET EXTRACTOR NODE...\n")
+    # async def snippet_extractor(self, state: State) -> State:
+    #     logger.info("\n\n SNIPPET EXTRACTOR NODE...\n")
         
-        #either select the user query or the modified prompt if available
-        user_prompt = state.get("prompt_without_ui", self.user_query)
-        output = await SnippetExtractorAgent(
-            llm=self.llm, 
-            user_prompt=user_prompt, 
-            url=self.url
+    #     #either select the user query or the modified prompt if available
+    #     user_prompt = state.get("prompt_without_ui", self.user_query)
+    #     output = await SnippetExtractorAgent(
+    #         llm=self.llm, 
+    #         user_prompt=user_prompt, 
+    #         url=self.url
             
-            ).run_agent()
-        state['extracted_snippet_agent_msg'] = self._get_output_value(output, "agent_msg", "")
-        state['snippet_check'] = self._get_output_value(output, "snippet_check", False)
-        state['extracted_snippet'] = self._get_output_value(output, "extracted_snippet", "")
+    #         ).run_agent()
+    #     state['extracted_snippet_agent_msg'] = self._get_output_value(output, "agent_msg", "")
+    #     state['snippet_check'] = self._get_output_value(output, "snippet_check", False)
+    #     state['extracted_snippet'] = self._get_output_value(output, "extracted_snippet", "")
 
-        print("\n\n\n EXTRACTED SNIPPET: ", output.extracted_snippet)
+    #     print("\n\n\n EXTRACTED SNIPPET: ", output.extracted_snippet)
 
         
-        return state
+        # return state
 
     def QA_possibility(self, state: State) -> State:
         logger.info("\n\n QA POSSIBILTY CHECKER AGENT...\n")
@@ -183,10 +183,10 @@ class AgentOrchestrator:
         output = QAPossibilityChecker(
             llm=self.llm,
             user_prompt=user_prompt,
-            extracted_snippet=state['extracted_snippet']
+            url=self.url,
         ).run_agent()
         state["QA_possibility_agent_msg"] = output.agent_msg
-        state["QA_possibility_check"] = output.qa_possibilty
+        state["QA_possibility_check"] = output.qa_possibility
         return state
 
     def prompt_enhancer(self, state: State) -> State:
@@ -274,11 +274,11 @@ class AgentOrchestrator:
                     "check": final_state.get("webpage_check", False),
                     "message": final_state.get("webpage_msg", "")
                 },
-                "snippet_extraction": {
-                    "check": final_state.get("snippet_check", False),
-                    "message": final_state.get("extracted_snippet_agent_msg", ""),
-                    "snippet": final_state.get("extracted_snippet", "")
-                },
+                # "snippet_extraction": {
+                #     "check": final_state.get("snippet_check", False),
+                #     "message": final_state.get("extracted_snippet_agent_msg", ""),
+                #     "snippet": final_state.get("extracted_snippet", "")
+                # },
                 "qa_possibility": {
                     "check": final_state.get("QA_possibility_check", False),
                     "message": final_state.get("QA_possibility_agent_msg", "")
@@ -287,9 +287,9 @@ class AgentOrchestrator:
                     "prompt": final_state.get("enhanced_prompt", ""),
                     "message": final_state.get("enhanced_prompt_agent_msg", "")
                 },
-                "evaluation_previous_goal": "Previous goal completed successfully",
-                "memory": "Task completed successfully",
-                "next_goal": "Task completed"
+                # "evaluation_previous_goal": "Previous goal completed successfully",
+                # "memory": "Task completed successfully",
+                # "next_goal": "Task completed"
             }
             
             return AgentHistoryList(
