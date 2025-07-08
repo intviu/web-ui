@@ -1,11 +1,25 @@
+from typing import AsyncGenerator, Dict, Any
 import asyncio
 import json
 import logging
 import os
 import uuid
 from typing import Any, AsyncGenerator, Dict, Optional
-
+import os, time
+from src.browser.browser_recorder import BrowserRecorder
+from browser_use.agent.views import (
+    ActionResult,
+    AgentHistory,
+    AgentHistoryList,
+    AgentStepInfo,
+    ToolCallingMethod,
+)
+import re
+import ast
 import gradio as gr
+
+import re
+
 
 # from browser_use.agent.service import Agent
 from browser_use.agent.views import (
@@ -30,6 +44,12 @@ from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
+import re
+import ast
+
+import re
+
+
 
 # --- Helper Functions --- (Defined at module level)
 
@@ -38,9 +58,9 @@ async def _initialize_llm(
         provider: Optional[str],
         model_name: Optional[str],
         temperature: float,
-        base_url: Optional[str],
+        #base_url: Optional[str],              #Not required by current llm_provider implementation
         api_key: Optional[str],
-        num_ctx: Optional[int] = None,
+        #num_ctx: Optional[int] = None,        #Context window control not implemented 
 ) -> Optional[BaseChatModel]:
     """Initializes the LLM based on settings. Returns None if provider/model is missing."""
     if not provider or not model_name:
@@ -56,10 +76,10 @@ async def _initialize_llm(
             provider=provider,
             model_name=model_name,
             temperature=temperature,
-            base_url=base_url or None,
+            #base_url=base_url or None,             #not needed in current setup.
             api_key=api_key or None,
             # Add other relevant params like num_ctx for ollama
-            num_ctx=num_ctx if provider == "ollama" else None,
+            #num_ctx=num_ctx if provider == "ollama" else None,             #may control context window size for some providers but unused here.
         )
         return llm
     except Exception as e:
@@ -69,34 +89,35 @@ async def _initialize_llm(
         )
         return None
 
+#This function is defined to get Gradio settings but is never used anywhere in the code.
 
-def _get_config_value(
-        webui_manager: WebuiManager,
-        comp_dict: Dict[gr.components.Component, Any],
-        comp_id_suffix: str,
-        default: Any = None,
-) -> Any:
-    """Safely get value from component dictionary using its ID suffix relative to the tab."""
-    # Assumes component ID format is "tab_name.comp_name"
-    tab_name = "browser_use_agent"  # Hardcode or derive if needed
-    comp_id = f"{tab_name}.{comp_id_suffix}"
-    # Need to find the component object first using the ID from the manager
-    try:
-        comp = webui_manager.get_component_by_id(comp_id)
-        return comp_dict.get(comp, default)
-    except KeyError:
-        # Try accessing settings tabs as well
-        for prefix in ["agent_settings", "browser_settings"]:
-            try:
-                comp_id = f"{prefix}.{comp_id_suffix}"
-                comp = webui_manager.get_component_by_id(comp_id)
-                return comp_dict.get(comp, default)
-            except KeyError:
-                continue
-        logger.warning(
-            f"Component with suffix '{comp_id_suffix}' not found in manager for value lookup."
-        )
-        return default
+# def _get_config_value(
+#         webui_manager: WebuiManager,
+#         comp_dict: Dict[gr.components.Component, Any],
+#         comp_id_suffix: str,
+#         default: Any = None,
+# ) -> Any:
+#     """Safely get value from component dictionary using its ID suffix relative to the tab."""
+#     # Assumes component ID format is "tab_name.comp_name"
+#     tab_name = "browser_use_agent"  # Hardcode or derive if needed
+#     comp_id = f"{tab_name}.{comp_id_suffix}"
+#     # Need to find the component object first using the ID from the manager
+#     try:
+#         comp = webui_manager.get_component_by_id(comp_id)
+#         return comp_dict.get(comp, default)
+#     except KeyError:
+#         # Try accessing settings tabs as well
+#         for prefix in ["agent_settings", "browser_settings"]:
+#             try:
+#                 comp_id = f"{prefix}.{comp_id_suffix}"
+#                 comp = webui_manager.get_component_by_id(comp_id)
+#                 return comp_dict.get(comp, default)
+#             except KeyError:
+#                 continue
+#         logger.warning(
+#             f"Component with suffix '{comp_id_suffix}' not found in manager for value lookup."
+#         )
+#         return default
 
 
 def _format_agent_output(model_output: AgentOutput) -> str:
@@ -156,7 +177,10 @@ async def _handle_new_step(
     #get the current directory
     #and create a new directory according to the step number
     current_dir = os.path.dirname(__file__)
-    output_data_dir = os.path.join(current_dir, "..", "..", "outputdata", "step_" + str(step_num))
+    # output_data_dir = os.path.join(current_dir, "..", "..", "src", "outputdata", "step_" + str(step_num))
+    #output_data_dir = os.path.join(current_dir, "..", "..", "outputdata", "step_" + str(step_num))
+    output_data_dir = "./outputdata"
+
     os.makedirs(output_data_dir, exist_ok=True)
 
     # --- Screenshot Handling ---
@@ -172,7 +196,8 @@ async def _handle_new_step(
                     isinstance(screenshot_data, str) and len(screenshot_data) > 100
             ):  
                 # Decode the base64 string
-                image_to_save_locally = screenshot_data = base64.b64decode(screenshot_data)
+                #image_to_save_locally = screenshot_data = base64.b64decode(screenshot_data)      # change this line of code bc here screenshot_data value is override
+                image_to_save_locally = base64.b64decode(screenshot_data)
 
                 #saving the image in the output data directory
                 image_path = os.path.join(output_data_dir, "output_image.png")
@@ -186,7 +211,7 @@ async def _handle_new_step(
                 
                 # Arbitrary length check
                 # *** UPDATED STYLE: Removed centering, adjusted width ***
-                img_tag = f'<img src="data:image/jpeg;base64,{screenshot_data}" alt="Step {step_num} Screenshot" style="max-width: 800px; max-height: 600px; object-fit:contain;" />'
+                img_tag = f'<img src="data:image/jpeg;base64,{image_to_save_locally}" alt="Step {step_num} Screenshot" style="max-width: 800px; max-height: 600px; object-fit:contain;" />'
                 screenshot_html = (
                         img_tag + "<br/>"
                 )  # Use <br/> for line break after inline-block image
@@ -240,7 +265,8 @@ async def _handle_new_step(
     await asyncio.sleep(0.05)
 
     # Check if video recording is active
-    if hasattr(webui_manager.bu_browser, 'recorder'):
+    if hasattr(webui_manager.bu_browser, ''
+    ''):
         if webui_manager.bu_browser.recorder.is_video_recording():
             logger.info("🎥 Video recording is active")
         else:
@@ -270,434 +296,634 @@ def _handle_done(webui_manager: WebuiManager, history: AgentHistoryList):
         {"role": "assistant", "content": final_summary}
     )
 
+#This callback handles agent help requests but isn’t used in the current flow. 
+# and This feature is disabled for the current use case.
 
-async def _ask_assistant_callback(
-        webui_manager: WebuiManager, query: str, browser_context: BrowserContext
-) -> Dict[str, Any]:
-    """Callback triggered by the agent's ask_for_assistant action."""
-    logger.info("Agent requires assistance. Waiting for user input.")
+# async def _ask_assistant_callback(
+#         webui_manager: WebuiManager, query: str #, browser_context: BrowserContext
+# ) -> Dict[str, Any]:
+#     """Callback triggered by the agent's ask_for_assistant action."""
+#     logger.info("Agent requires assistance. Waiting for user input.")
 
-    if not hasattr(webui_manager, "_chat_history"):
-        logger.error("Chat history not found in webui_manager during ask_assistant!")
-        return {"response": "Internal Error: Cannot display help request."}
+#     if not hasattr(webui_manager, "_chat_history"):
+#         logger.error("Chat history not found in webui_manager during ask_assistant!")
+#         return {"response": "Internal Error: Cannot display help request."}
 
-    webui_manager.bu_chat_history.append(
-        {
-            "role": "assistant",
-            "content": f"**Need Help:** {query}\nPlease provide information or perform the required action in the browser, then type your response/confirmation below and click 'Submit Response'.",
-        }
-    )
+#     webui_manager.bu_chat_history.append(
+#         {
+#             "role": "assistant",
+#             "content": f"**Need Help:** {query}\nPlease provide information or perform the required action in the browser, then type your response/confirmation below and click 'Submit Response'.",
+#         }
+#     )
 
-    # Use state stored in webui_manager
-    webui_manager.bu_response_event = asyncio.Event()
-    webui_manager.bu_user_help_response = None  # Reset previous response
+#     # Use state stored in webui_manager
+#     webui_manager.bu_response_event = asyncio.Event()
+#     webui_manager.bu_user_help_response = None  # Reset previous response
 
-    try:
-        logger.info("Waiting for user response event...")
-        await asyncio.wait_for(
-            webui_manager.bu_response_event.wait(), timeout=3600.0
-        )  # Long timeout
-        logger.info("User response event received.")
-    except asyncio.TimeoutError:
-        logger.warning("Timeout waiting for user assistance.")
-        webui_manager.bu_chat_history.append(
-            {
-                "role": "assistant",
-                "content": "**Timeout:** No response received. Trying to proceed.",
-            }
-        )
-        webui_manager.bu_response_event = None  # Clear the event
-        return {"response": "Timeout: User did not respond."}  # Inform the agent
+#     try:
+#         logger.info("Waiting for user response event...")
+#         await asyncio.wait_for(
+#             webui_manager.bu_response_event.wait(), timeout=3600.0
+#         )  # Long timeout
+#         logger.info("User response event received.")
+#     except asyncio.TimeoutError:
+#         logger.warning("Timeout waiting for user assistance.")
+#         webui_manager.bu_chat_history.append(
+#             {
+#                 "role": "assistant",
+#                 "content": "**Timeout:** No response received. Trying to proceed.",
+#             }
+#         )
+#         webui_manager.bu_response_event = None  # Clear the event
+#         return {"response": "Timeout: User did not respond."}  # Inform the agent
 
-    response = webui_manager.bu_user_help_response
-    webui_manager.bu_chat_history.append(
-        {"role": "user", "content": response}
-    )  # Show user response in chat
-    webui_manager.bu_response_event = (
-        None  # Clear the event for the next potential request
-    )
-    return {"response": response}
+#     response = webui_manager.bu_user_help_response
+#     webui_manager.bu_chat_history.append(
+#         {"role": "user", "content": response}
+#     )  # Show user response in chat
+#     webui_manager.bu_response_event = (
+#         None  # Clear the event for the next potential request
+#     )
+#     return {"response": response}
 
 # --- Core Agent Execution Logic --- (Needs access to webui_manager)
 
-async def run_agent_task(
-        webui_manager: WebuiManager, components: Dict[gr.components.Component, Any]
-) -> AsyncGenerator[Dict[gr.components.Component, Any], None]:
-    """Handles the entire lifecycle of initializing and running the agent."""
+async def run_agent_task(query: str, url: str) -> Dict[str, Any]:
+    """
+    Simplified agent runner that handles everything
+    Returns: {
+        "task_id": str,
+        "final_result": str,
+        "screenshot_paths": list[str],
+        "response_paths": list[str],
+        "output_dir": str
+    }
+    """
+    task_id = str(uuid.uuid4())
+    output_dir = os.path.join("src", "outputdata")
     
-    # Initialize final_update at the start
-    final_update = {}
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # 1. Initialize browser
+    playwright = await async_playwright().start()
+    browser = CustomBrowser(
+        config=BrowserConfig(
+            headless=False,
+            disable_security=False,
+            extra_browser_args=[],
+            new_context_config=BrowserContextConfig(
+                window_width=1280,
+                window_height=1100
+            )
+        )
+    )
+    
+    
+    playwright_browser = await browser._setup_builtin_browser(playwright)
+    
+    # Setup recorder with the actual browser instance
+    recorder = BrowserRecorder()
+    browser_context = await recorder.setup_recording(playwright_browser)  # FIXED HERE
+    
+    
+    # 2. Create context
+    context_config = BrowserContextConfig(
+        save_downloads_path=os.path.join(output_dir, "downloads"),
+        window_height=1100,
+        window_width=1280,
+    )
+    browser_context = await browser.new_context(config=context_config)
+    await browser_context.setup()
+    
+    # 3. Initialize controller
+    controller = CustomController()
+    
+    # 4. Initialize LLM
+    llm = await _initialize_llm(
+        provider="openai",
+        model_name="gpt-4o",
+        temperature=0.6,
+        api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
+    # 5. Create step handler
+    async def handle_step(state: BrowserState, output: AgentOutput, step_num: int):
+        """Process each agent step and save outputs"""
+        step_dir = os.path.join(output_dir, f"step_{step_num}")
+        os.makedirs(step_dir, exist_ok=True)
+        
+        # Save screenshot
+        screenshot_path = None
+        if state.screenshot:
+            try:
+                image_data = base64.b64decode(state.screenshot)
+                screenshot_path = os.path.join(step_dir, "screenshot.png")
+                with open(screenshot_path, "wb") as f:
+                    f.write(image_data)
+            except Exception as e:
+                logger.error(f"Error saving screenshot: {e}")
+        
+        # Save agent response
+        response_data = {
+            "evaluation_previous_goal": getattr(output.current_state, "evaluation_previous_goal", ""),
+            "memory": getattr(output.current_state, "memory", ""),
+            "next_goal": getattr(output.current_state, "next_goal", ""),
+        }
+        response_path = os.path.join(step_dir, "agent_response.json")
+        with open(response_path, "w") as f:
+            json.dump(response_data, f)
+            
+        return screenshot_path, response_path
 
-    # --- Get Components ---
-    # Need handles to specific UI components to update them
-    user_input_comp = webui_manager.get_component_by_id("browser_use_agent.user_input")
-    url_input_comp = webui_manager.get_component_by_id("browser_use_agent.url_input")
-    run_button_comp = webui_manager.get_component_by_id("browser_use_agent.run_button")
-    stop_button_comp = webui_manager.get_component_by_id(
-        "browser_use_agent.stop_button"
+    # 6. Run agent
+    agent = AgentOrchestrator(
+        llm=llm,
+        browser_config={
+            "headless": False,
+            "window_width": 1280,
+            "window_height": 1100,
+            "use_own_browser": True,
+            "disable_security": False,
+            "url": url
+        },
+        use_vision=True,
+        max_actions_per_step=5,
+        generate_gif=True,
+        user_query=f"{query}  url: {url}",
+        url=url,
+        register_new_step_callback=handle_step,
+        #done_callback=lambda history: logger.info(f"Task completed in {history.total_duration_seconds():.2f}s"),
+        override_system_prompt=None,
+        extend_system_prompt=None,
     )
-    pause_resume_button_comp = webui_manager.get_component_by_id(
-        "browser_use_agent.pause_resume_button"
+    
+    history = await agent.run(
+        task=f"{query}  url: {url}",
+        browser=browser,
+        browser_context=browser_context,
+        controller=controller
     )
-    clear_button_comp = webui_manager.get_component_by_id(
-        "browser_use_agent.clear_button"
-    )
-    chatbot_comp = webui_manager.get_component_by_id("browser_use_agent.chatbot")
-    history_file_comp = webui_manager.get_component_by_id(
-        "browser_use_agent.agent_history_file"
-    )
-    gif_comp = webui_manager.get_component_by_id("browser_use_agent.recording_gif")
-    browser_view_comp = webui_manager.get_component_by_id(
-        "browser_use_agent.browser_view"
-    )
+    last_result = None
 
-    # --- 1. Get Task and Initial UI Update ---
-    task = components.get(user_input_comp, "").strip()
-    url = components.get(url_input_comp, "").strip()
+    if history.history:
+        last_history_item = history.history[-1]  # Get the last history item
+        if last_history_item.result:
+            last_result = last_history_item.result[-1]  # Get the last result in that item
 
-    #lets always make sure that if the task is not empty then it should have the url in it
-    if task:
-        task += f"  url:  {url}"
+    # Now you can access fields like:
+    if last_result:
+        
+        print(type(last_result.extracted_content))
+        
+        print("sample output:",last_result.extracted_content[-1])
+        print("✅ Extracted Content:", last_result.extracted_content)
+        print("✅ Is Done:", last_result.is_done)
+        #logger.info(f'📄 Result: {result[-1].extracted_content}')
 
     else:
-        gr.Warning("Please enter a task.")
-        yield {run_button_comp: gr.update(interactive=True)}
-        return
+        print("⚠️ No result found.")
 
-    # Set running state indirectly via _current_task
-    webui_manager.bu_chat_history.append({"role": "user", "content": task})
+    await recorder.save_recording()
 
-    yield {
-        user_input_comp: gr.Textbox(
-            value="", interactive=False, placeholder="Agent is running..."
-        ),
-        run_button_comp: gr.Button(value="⏳ Running...", interactive=False),
-        stop_button_comp: gr.Button(interactive=True),
-        pause_resume_button_comp: gr.Button(value="⏸️ Pause", interactive=True),
-        clear_button_comp: gr.Button(interactive=False),
-        chatbot_comp: gr.update(value=webui_manager.bu_chat_history),
-        history_file_comp: gr.update(value=None),
-        gif_comp: gr.update(value=None),
+    
+    # 7. Cleanup
+    await browser_context.close()
+    await browser.close()
+    await playwright.stop()
+  
+    videos = recorder.get_recorded_videos()
+    
+    # Validate that videos actually exist
+    valid_videos = []
+    for video in videos:
+        video_path = os.path.join("outputdata", "videos", video)
+        if os.path.exists(video_path):
+            valid_videos.append(video)
+        else:
+            logger.warning(f"⚠️ Video file not found: {video_path}")
+
+       
+    final_result = "No result"
+    if last_result and last_result.extracted_content:
+        content = last_result.extracted_content
+        match = re.search(r"'done':\s*\{(.*?)\}", content, re.DOTALL)
+        if match:
+            final_result = match.group(1).strip()
+            print("✅ Extracted final result :", final_result)
+        else:
+            final_result = content.strip()  # fallback if regex doesn't match
+    else:
+        final_result = history.final_result() or "No result"
+
+
+#     # Get only the final ActionResult.extracted_content
+#     final_result = (
+#         last_result.extracted_content 
+#         if last_result and last_result.extracted_content 
+#         else history.final_result() or "No result"
+# )
+    return {
+        "task_id": task_id,
+        "final_result": final_result,
+        "videos": valid_videos
     }
-
-    # --- 2. Get Settings ---
-    def get_setting(key, default=None):
-        comp = webui_manager.id_to_component.get(f"agent_settings.{key}")
-        return components.get(comp, default) if comp else default
-
-    # Main LLM Settings
-    llm_provider_name = get_setting("llm_provider") or "openai"
-    llm_model_name = get_setting("llm_model_name") or "gpt-4o"
-    llm_temperature = get_setting("llm_temperature", 0.6)
-    llm_base_url = get_setting("llm_base_url") or None
-    llm_api_key = get_setting("llm_api_key") or None
-    ollama_num_ctx = get_setting("ollama_num_ctx", 16000)
-    use_vision = get_setting("use_vision", False)
-    max_actions = get_setting("max_actions_per_step", 5)
-    max_steps = get_setting("max_steps", 25)
-    tool_calling_method = get_setting("tool_calling_method", "auto")
-    max_input_tokens = get_setting("max_input_tokens", 16000)
-    override_system_prompt = get_setting("override_system_prompt") or None
-    extend_system_prompt = get_setting("extend_system_prompt") or None
-
-    # --- 3. Initialize LLM ---
-    logger.info(f"Initializing LLM: Provider={llm_provider_name}, Model={llm_model_name}, Temp={llm_temperature}")
-    main_llm = await _initialize_llm(
-        llm_provider_name,
-        llm_model_name,
-        llm_temperature,
-        llm_base_url,
-        llm_api_key,
-        ollama_num_ctx if llm_provider_name == "ollama" else None,
+    
+    
+async def _initialize_llm(
+        provider: str,
+        model_name: str,
+        temperature: float,
+        api_key: Optional[str] = None
+) -> BaseChatModel:
+    """Initialize LLM instance"""
+    logger.info(f"Initializing LLM: {provider}/{model_name}")
+    return llm_provider.get_llm_model(
+        provider=provider,
+        model_name=model_name,
+        temperature=temperature,
+        api_key=api_key,
     )
 
-    planner_llm_provider_name = get_setting("planner_llm_provider") or None
-    planner_llm = None
-    planner_use_vision = False
-    if planner_llm_provider_name:
-        planner_llm_model_name = get_setting("planner_llm_model_name")
-        planner_llm_temperature = get_setting("planner_llm_temperature", 0.6)
-        planner_ollama_num_ctx = get_setting("planner_ollama_num_ctx", 16000)
-        planner_llm_base_url = get_setting("planner_llm_base_url") or None
-        planner_llm_api_key = get_setting("planner_llm_api_key") or None
-        planner_use_vision = get_setting("planner_use_vision", False)
+# changed####******!!!!!!
+# async def run_agent_task(
+#         webui_manager: WebuiManager, components: Dict[gr.components.Component, Any]
+# ) -> AsyncGenerator[Dict[gr.components.Component, Any], None]:
+    
+#     # Initialize final_update at the start
+#     final_update = {}
 
-        planner_llm = await _initialize_llm(
-            planner_llm_provider_name,
-            planner_llm_model_name,
-            planner_llm_temperature,
-            planner_llm_base_url,
-            planner_llm_api_key,
-            planner_ollama_num_ctx if planner_llm_provider_name == "ollama" else None,
-        )
+#     # --- Get Components ---
+#     # Need handles to specific UI components to update them
+#     user_input_comp = webui_manager.get_component_by_id("browser_use_agent.user_input")
+#     url_input_comp = webui_manager.get_component_by_id("browser_use_agent.url_input")
+#     run_button_comp = webui_manager.get_component_by_id("browser_use_agent.run_button")
+#     stop_button_comp = webui_manager.get_component_by_id("browser_use_agent.stop_button")
+#     #pause_resume_button_comp = webui_manager.get_component_by_id("browser_use_agent.pause_resume_button")      #Pause/resume functionality not implemented in agent state machine
+#     clear_button_comp = webui_manager.get_component_by_id("browser_use_agent.clear_button")
+#     #chatbot_comp = webui_manager.get_component_by_id("browser_use_agent.chatbot")
+#     history_file_comp = webui_manager.get_component_by_id("browser_use_agent.agent_history_file")
+#     gif_comp = webui_manager.get_component_by_id("browser_use_agent.recording_gif")
+#     #browser_view_comp = webui_manager.get_component_by_id("browser_use_agent.browser_view")                    #not used used anywhere
 
-    # --- 4. Browser Settings ---
-    def get_browser_setting(key, default=None):
-        comp = webui_manager.id_to_component.get(f"browser_settings.{key}")
-        return components.get(comp, default) if comp else default
+#     # --- 1. Get Task and Initial UI Update ---
+#     task = components.get(user_input_comp, "").strip()
+#     url = components.get(url_input_comp, "").strip()
 
-    browser_binary_path = get_browser_setting("browser_binary_path") or None
-    browser_user_data_dir = get_browser_setting("browser_user_data_dir") or None
-    use_own_browser = get_browser_setting("use_own_browser", False)
-    keep_browser_open = get_browser_setting("keep_browser_open", False)
-    headless = get_browser_setting("headless", False)
-    disable_security = get_browser_setting("disable_security", False)
-    window_w = int(get_browser_setting("window_w", 1280))
-    window_h = int(get_browser_setting("window_h", 1100))
-    cdp_url = get_browser_setting("cdp_url") or None
-    wss_url = get_browser_setting("wss_url") or None
-    save_recording_path = get_browser_setting("save_recording_path") or None
-    save_trace_path = get_browser_setting("save_trace_path") or None
-    save_agent_history_path = get_browser_setting("save_agent_history_path", "./tmp/agent_history")
-    save_download_path = get_browser_setting("save_download_path", "./tmp/downloads")
-    should_close_browser_on_finish = not keep_browser_open
+#     #lets always make sure that if the task is not empty then it should have the url in it
+#     if task:
+#         task += f"  url:  {url}"
 
-    # Create necessary directories
-    os.makedirs(save_agent_history_path, exist_ok=True)
-    if save_recording_path:
-        os.makedirs(save_recording_path, exist_ok=True)
-    if save_trace_path:
-        os.makedirs(save_trace_path, exist_ok=True)
-    if save_download_path:
-        os.makedirs(save_download_path, exist_ok=True)
+#     else:
+#         gr.Warning("Please enter a task.")
+#         yield {run_button_comp: gr.update(interactive=True)}
+#         return
 
-    # --- 5. Initialize Browser and Context ---
-    try:
-        # Close existing resources if not keeping open
-        if not keep_browser_open:
-            if webui_manager.bu_browser_context:
-                logger.info("Closing previous browser context.")
-                await webui_manager.bu_browser_context.close()
-                webui_manager.bu_browser_context = None
-            if webui_manager.bu_browser:
-                logger.info("Closing previous browser.")
-                await webui_manager.bu_browser.close()
-                webui_manager.bu_browser = None
+#     # Set running state indirectly via _current_task
+#     webui_manager.bu_chat_history.append({"role": "user", "content": task})
 
-        # Create Browser if needed
-        if not webui_manager.bu_browser:
-            logger.info("Launching new browser instance.")
-            extra_args = []
-            if use_own_browser:
-                browser_binary_path = os.getenv("BROWSER_PATH", None) or browser_binary_path
-                if browser_binary_path == "":
-                    browser_binary_path = None
-                browser_user_data = browser_user_data_dir or os.getenv("BROWSER_USER_DATA", None)
-                if browser_user_data:
-                    extra_args += [f"--user-data-dir={browser_user_data}"]
-            else:
-                browser_binary_path = None
+#     yield {
+#         user_input_comp: gr.Textbox(
+#             value="", interactive=False, placeholder="Agent is running..."
+#         ),
+#         run_button_comp: gr.Button(value="⏳ Running...", interactive=False),
+#         stop_button_comp: gr.Button(interactive=True),
+#         #pause_resume_button_comp: gr.Button(value="⏸️ Pause", interactive=True),                 #resume and pause button is not needed
+#         clear_button_comp: gr.Button(interactive=False),
+#         #chatbot_comp: gr.update(value=webui_manager.bu_chat_history),
+#         history_file_comp: gr.update(value=None),
+#         gif_comp: gr.update(value=None),
+#     }
 
-            webui_manager.bu_browser = CustomBrowser(
-                config=BrowserConfig(
-                    headless=headless,
-                    disable_security=disable_security,
-                    browser_binary_path=browser_binary_path,
-                    extra_browser_args=extra_args,
-                    wss_url=wss_url,
-                    cdp_url=cdp_url,
-                    new_context_config=BrowserContextConfig(
-                        window_width=window_w,
-                        window_height=window_h,
-                    )
-                )
-            )
+#     # --- 2. Get Settings ---
+#     def get_setting(key, default=None):
+#         comp = webui_manager.id_to_component.get(f"agent_settings.{key}")
+#         return components.get(comp, default) if comp else default
+
+#     # Main LLM Settings
+#     llm_provider_name = get_setting("llm_provider") or "openai"
+#     llm_model_name = get_setting("llm_model_name") or "gpt-4o"
+#     llm_temperature = 0.6 #get_setting("llm_temperature", 0.6)         #we are not giving option to user to select the temp
+#     #llm_base_url = get_setting("llm_base_url") or None                #no need for this here
+#     llm_api_key =None #get_setting("llm_api_key") or None
+#     #ollama_num_ctx = get_setting("ollama_num_ctx", 16000)              #ontext window setting is not used in current LLM initialization or agent workflow
+#     use_vision = True #get_setting("use_vision", True)
+#     max_actions = 5 # get_setting("max_actions_per_step", 5)
+#     #max_steps = get_setting("max_steps", 25)
+#     #tool_calling_method = get_setting("tool_calling_method", "auto")    # Not implemented in agent workflow
+#     #max_input_tokens = get_setting("max_input_tokens", 16000)
+#     # override_system_prompt = get_setting("override_system_prompt") or None
+#     # extend_system_prompt = get_setting("extend_system_prompt") or None
+
+#     #we would not be using the override_system_prompt and extend_system_prompt
+#     # as they are being passed to the AgentOrhcestrator, we need to srt a default value
+#     override_system_prompt = None
+#     extend_system_prompt = None
+
+#     # --- 3. Initialize LLM ---
+#     logger.info(f"Initializing LLM: Provider={llm_provider_name}, Model={llm_model_name}, Temp={llm_temperature}")
+#     main_llm = await _initialize_llm(
+#         llm_provider_name,
+#         llm_model_name,
+#         llm_temperature,
+#         #llm_base_url,
+#         llm_api_key,
+#         #ollama_num_ctx if llm_provider_name == "ollama" else None,
+#     )
+
+# #/////////////////
+# #planner functionality using a separate LLM is not required in the current setup.
+# #/////////////////
+
+#     # planner_llm_provider_name = None                        
+#     # planner_llm = None
+#     # planner_use_vision = False
+#     # if planner_llm_provider_name:
+#     #     planner_llm_model_name = None# get_setting("planner_llm_model_name")
+#     #     planner_llm_temperature = 0.6 #get_setting("planner_llm_temperature", 0.6)
+#     #     #planner_ollama_num_ctx = get_setting("planner_ollama_num_ctx", 16000)
+#     #     #planner_llm_base_url = get_setting("planner_llm_base_url") or None
+#     #     #planner_llm_api_key = get_setting("planner_llm_api_key") or None
+#     #     planner_use_vision = get_setting("planner_use_vision", False)
+
+
+
+#     #     planner_llm = await _initialize_llm(
+#     #         planner_llm_provider_name,
+#     #         planner_llm_model_name,
+#     #         planner_llm_temperature,
+#     #         #planner_llm_base_url,
+#     #         #planner_llm_api_key,
+#     #         #planner_ollama_num_ctx if planner_llm_provider_name == "ollama" else None,
+#     #     )
+
+#     # --- 4. Browser Settings ---
+#     def get_browser_setting(key, default=None):
+#         comp = webui_manager.id_to_component.get(f"browser_settings.{key}")
+#         return components.get(comp, default) if comp else default
+
+#     #browser_binary_path = get_browser_setting("browser_binary_path") or None               #not needed
+#     #browser_user_data_dir = get_browser_setting("browser_user_data_dir") or None          #not accessed any where
+#     use_own_browser = True # get_browser_setting("use_own_browser", True)                  #we are not giving this option to the user
+#     keep_browser_open = False #get_browser_setting("keep_browser_open", False)
+#     headless = False #get_browser_setting("headless", False)                                #setting the value False bydefault
+#     disable_security = False# get_browser_setting("disable_security", False)
+#     window_w = 1280 #int(get_browser_setting("window_w", 1280))                             #no need to get value from user hardcode it
+#     window_h = 1100#int(get_browser_setting("window_h", 1100))                              #no need to get value from user hardcode it
+#     #cdp_url = get_browser_setting("cdp_url") or None                                  # not required in current browser
+#     #wss_url = get_browser_setting("wss_url") or None                                   #not used in this deployment.
+#     save_recording_path = None #get_browser_setting("save_recording_path") or None         # Recording handled through context config
+#     save_trace_path = None #get_browser_setting("save_trace_path") or None                 # Tracing handled through context config
+#     save_agent_history_path = get_browser_setting("save_agent_history_path", "./tmp/agent_history")
+#     save_download_path = get_browser_setting("save_download_path", "./tmp/downloads")
+#     #should_close_browser_on_finish = not keep_browser_open                                #this logic is not used here 
+
+#     # Create necessary directories
+#     os.makedirs(save_agent_history_path, exist_ok=True)
+#     if save_recording_path:
+#         os.makedirs(save_recording_path, exist_ok=True)
+#     if save_trace_path:
+#         os.makedirs(save_trace_path, exist_ok=True)
+#     if save_download_path:
+#         os.makedirs(save_download_path, exist_ok=True)
+
+#     # --- 5. Initialize Browser and Context ---
+#     try:
+#         # Close existing resources if not keeping open
+#         if not keep_browser_open:
+#             if webui_manager.bu_browser_context:
+#                 logger.info("Closing previous browser context.")
+#                 await webui_manager.bu_browser_context.close()
+#                 webui_manager.bu_browser_context = None
+#             if webui_manager.bu_browser:
+#                 logger.info("Closing previous browser.")
+#                 await webui_manager.bu_browser.close()
+#                 webui_manager.bu_browser = None
+
+#         # Create Browser if needed
+#         if not webui_manager.bu_browser:
+#             logger.info("Launching new browser instance.")
+#             extra_args = []
+
+#             # if use_own_browser:
+#             #     browser_binary_path = os.getenv("BROWSER_PATH", None) or browser_binary_path
+#             #     if browser_binary_path == "":
+#             #         browser_binary_path = None
+#             #     browser_user_data = browser_user_data_dir or os.getenv("BROWSER_USER_DATA", None)
+#             #     if browser_user_data:
+#             #         extra_args += [f"--user-data-dir={browser_user_data}"]
+#             # else:
+#             #     browser_binary_path = None
+
+#             webui_manager.bu_browser = CustomBrowser(
+#                 config=BrowserConfig(
+#                     headless=headless,
+#                     disable_security=disable_security,
+#                     #browser_binary_path=browser_binary_path,               #no need , already removed from browser settings
+#                     extra_browser_args=extra_args,
+#                     # wss_url=wss_url,                                       #already removed from browser settings
+#                     # cdp_url=cdp_url,                                       #no need,already removed from get browser settings
+#                     new_context_config=BrowserContextConfig(
+#                         window_width=window_w,
+#                         window_height=window_h,
+#                     )
+#                 )
+#             )
             
-            # Initialize the browser and keep playwright instance alive
-            webui_manager.bu_playwright = await async_playwright().start()
-            webui_manager.bu_browser.playwright_browser = await webui_manager.bu_browser._setup_builtin_browser(webui_manager.bu_playwright)
+#             # Initialize the browser and keep playwright instance alive
+#             webui_manager.bu_playwright = await async_playwright().start()
+#             webui_manager.bu_browser.playwright_browser = await webui_manager.bu_browser._setup_builtin_browser(webui_manager.bu_playwright)
 
-        # Create Context if needed
-        if not webui_manager.bu_browser_context:
-            logger.info("Creating new browser context.")
-            context_config = BrowserContextConfig(
-                trace_path=save_trace_path if save_trace_path else None,
-                save_recording_path=save_recording_path if save_recording_path else None,
-                save_downloads_path=save_download_path if save_download_path else None,
-                window_height=window_h,
-                window_width=window_w,
-            )
-            if not webui_manager.bu_browser:
-                raise ValueError("Browser not initialized, cannot create context.")
+#         # Create Context if needed
+#         if not webui_manager.bu_browser_context:
+#             logger.info("Creating new browser context.")
+#             context_config = BrowserContextConfig(
+#                 trace_path=save_trace_path if save_trace_path else None,
+#                 save_recording_path=save_recording_path if save_recording_path else None,
+#                 save_downloads_path=save_download_path if save_download_path else None,
+#                 window_height=window_h,
+#                 window_width=window_w,
+#             )
+#             if not webui_manager.bu_browser:
+#                 raise ValueError("Browser not initialized, cannot create context.")
             
-            webui_manager.bu_browser_context = (
-                await webui_manager.bu_browser.new_context(config=context_config)
-            )
+#             webui_manager.bu_browser_context = (
+#                 await webui_manager.bu_browser.new_context(config=context_config)
+#             )
 
-            print("\n\n\n\n RECORD VIDEO.....................`: \n\n\n\n")
-            logger.info("Setting up browser context with video recording...")
-            await webui_manager.bu_browser_context.setup()
-            logger.info("Browser context setup complete with video recording enabled")
+#             print("\n\n\n\n RECORD VIDEO.....................`: \n\n\n\n")
+#             logger.info("Setting up browser context with video recording...")
+#             await webui_manager.bu_browser_context.setup()
+#             logger.info("Browser context setup complete with video recording enabled")
 
-        # Initialize controller if needed
-        if not webui_manager.bu_controller:
-            webui_manager.bu_controller = CustomController()
+#         # Initialize controller if needed
+#         if not webui_manager.bu_controller:
+#             webui_manager.bu_controller = CustomController()
 
-        # --- 6. Initialize or Update Agent Orchestrator ---
-        webui_manager.bu_agent_task_id = str(uuid.uuid4())  # New ID for this task run
-        os.makedirs(
-            os.path.join(save_agent_history_path, webui_manager.bu_agent_task_id),
-            exist_ok=True,
-        )
-        history_file = os.path.join(
-            save_agent_history_path,
-            webui_manager.bu_agent_task_id,
-            f"{webui_manager.bu_agent_task_id}.json",
-        )
-        gif_path = os.path.join(
-            save_agent_history_path,
-            webui_manager.bu_agent_task_id,
-            f"{webui_manager.bu_agent_task_id}.gif",
-        )
+#         # --- 6. Initialize or Update Agent Orchestrator ---
+#         webui_manager.bu_agent_task_id = str(uuid.uuid4())  # New ID for this task run
+#         os.makedirs(
+#             os.path.join(save_agent_history_path, webui_manager.bu_agent_task_id),
+#             exist_ok=True,
+#         )
+#         history_file = os.path.join(
+#             save_agent_history_path,
+#             webui_manager.bu_agent_task_id,
+#             f"{webui_manager.bu_agent_task_id}.json",
+#         )
+#         gif_path = os.path.join(
+#             save_agent_history_path,
+#             webui_manager.bu_agent_task_id,
+#             f"{webui_manager.bu_agent_task_id}.gif",
+#         )
 
-        # Pass the webui_manager to callbacks when wrapping them
-        async def step_callback_wrapper(
-                state: BrowserState, output: AgentOutput, step_num: int
-        ):
-            # print("\n\n\n\n\n STEP CALLBACK WRAPPER CALLED\n\n\n\n\n")
-            await _handle_new_step(webui_manager, state, output, step_num)
+#         # Pass the webui_manager to callbacks when wrapping them
+#         async def step_callback_wrapper(
+#                 state: BrowserState, output: AgentOutput, step_num: int
+#         ):
+#             # print("\n\n\n\n\n STEP CALLBACK WRAPPER CALLED\n\n\n\n\n")
+#             await _handle_new_step(webui_manager, state, output, step_num)
 
-        def done_callback_wrapper(history: AgentHistoryList):
-            _handle_done(webui_manager, history)
+#         def done_callback_wrapper(history: AgentHistoryList):
+#             _handle_done(webui_manager, history)
 
-        if not webui_manager.bu_agent:
-            logger.info(f"Initializing new agent orchestrator for task: {task}")
-            if not webui_manager.bu_browser or not webui_manager.bu_browser_context:
-                raise ValueError(
-                    "Browser or Context not initialized, cannot create agent."
-                )
-            webui_manager.bu_agent = AgentOrchestrator(
-                llm=main_llm,
-                browser_config={
-                    "headless": headless,
-                    "window_width": window_w,
-                    "window_height": window_h,
-                    "use_own_browser": use_own_browser,
-                    "browser_binary_path": browser_binary_path,
-                    "wss_url": wss_url,
-                    "cdp_url": cdp_url,
-                    "disable_security": disable_security,
-                    "url": url if url else None
-                },
-                use_vision=use_vision,
-                max_actions_per_step=max_actions,
-                generate_gif=gif_path,
-                user_query=task,
-                url=url if url else None,
-                register_new_step_callback = step_callback_wrapper,
-                done_callback_wrapper = done_callback_wrapper,
-                override_system_prompt = override_system_prompt,
-                extend_system_prompt = extend_system_prompt,
-                planner_llm = planner_llm,
-                use_vision_for_planner = planner_use_vision if planner_llm else False,
+#         if not webui_manager.bu_agent:
+#             logger.info(f"Initializing new agent orchestrator for task: {task}")
+#             if not webui_manager.bu_browser or not webui_manager.bu_browser_context:
+#                 raise ValueError(
+#                     "Browser or Context not initialized, cannot create agent."
+#                 )
+#             webui_manager.bu_agent = AgentOrchestrator(
+#                 llm=main_llm,
+#                 browser_config={
+#                     "headless": headless,
+#                     "window_width": window_w,
+#                     "window_height": window_h,
+#                     "use_own_browser": use_own_browser,
+#                     #"browser_binary_path": browser_binary_path,                    #is already removed from LLM initialzation... 
+#                     #"wss_url": wss_url,                                            #wss is already removed from LLM initialzation...
+#                     #"cdp_url": cdp_url,                                            #same for cdp
+#                     "disable_security": disable_security,
+#                     "url": url if url else None
+#                 },
+#                 use_vision=use_vision,
+#                 max_actions_per_step=max_actions,
+#                 generate_gif=gif_path,
+#                 user_query=task,
+#                 url=url if url else None,
+#                 register_new_step_callback = step_callback_wrapper,
+#                 done_callback_wrapper = done_callback_wrapper,
+#                 override_system_prompt = override_system_prompt,
+#                 extend_system_prompt = extend_system_prompt,
+#                 # planner_llm = None,                                                         #only using main LLm for every thing
+#                 # use_vision_for_planner = planner_use_vision if planner_llm else False,
                 
-            )
+#             )
 
-        # --- 7. Run Agent Task and Stream Updates ---
-        agent_run_coro = webui_manager.bu_agent.run(
-            task=task,
-            browser=webui_manager.bu_browser,
-            browser_context=webui_manager.bu_browser_context,
-            controller=webui_manager.bu_controller
-        )
-        agent_task = asyncio.create_task(agent_run_coro)
-        webui_manager.bu_current_task = agent_task
+#         # --- 7. Run Agent Task and Stream Updates ---
+#         agent_run_coro = webui_manager.bu_agent.run(
+#             task=task,
+#             browser=webui_manager.bu_browser,
+#             browser_context=webui_manager.bu_browser_context,
+#             controller=webui_manager.bu_controller
+#         )
+#         agent_task = asyncio.create_task(agent_run_coro)
+#         webui_manager.bu_current_task = agent_task
 
-        # Wait for the agent to complete
-        try:
-            history = await agent_task
-            logger.info("Agent task finished.")
+#         # Wait for the agent to complete
+#         try:
+#             history = await agent_task
+#             logger.info("Agent task finished.")
             
-            # Force close browser and save videos
-            if webui_manager.bu_browser_context:
-                logger.info("Task completed - Saving videos and closing browser...")
-                try:
-                    # Save videos first
-                    video_paths = await webui_manager.bu_browser_context.save_videos()
-                    if video_paths:
-                        for path in video_paths:
-                            logger.info(f"Video recording saved to: {path}")
-                    else:
-                        logger.warning("No video recordings found to save")
+#             # Force close browser and save videos
+#             if webui_manager.bu_browser_context:
+#                 logger.info("Task completed - Saving videos and closing browser...")
+#                 try:
+#                     # Save videos first
+#                     video_paths = await webui_manager.bu_browser_context.save_videos()
+#                     if video_paths:
+#                         for path in video_paths:
+#                             logger.info(f"Video recording saved to: {path}")
+#                     else:
+#                         logger.warning("No video recordings found to save")
                         
-                    # Force close everything
-                    logger.info("Closing browser context after task.")
-                    await webui_manager.bu_browser_context.close()
-                    webui_manager.bu_browser_context = None
+#                     # Force close everything
+#                     logger.info("Closing browser context after task.")
+#                     await webui_manager.bu_browser_context.close()
+#                     webui_manager.bu_browser_context = None
                     
-                    if webui_manager.bu_browser:
-                        logger.info("Closing browser after task.")
-                        await webui_manager.bu_browser.close()
-                        webui_manager.bu_browser = None
+#                     if webui_manager.bu_browser:
+#                         logger.info("Closing browser after task.")
+#                         await webui_manager.bu_browser.close()
+#                         webui_manager.bu_browser = None
                         
-                    if webui_manager.bu_playwright:
-                        logger.info("Closing playwright after task.")
-                        await webui_manager.bu_playwright.stop()
-                        webui_manager.bu_playwright = None
+#                     if webui_manager.bu_playwright:
+#                         logger.info("Closing playwright after task.")
+#                         await webui_manager.bu_playwright.stop()
+#                         webui_manager.bu_playwright = None
                         
-                except Exception as e:
-                    logger.error(f"Error during cleanup: {e}")
+#                 except Exception as e:
+#                     logger.error(f"Error during cleanup: {e}")
             
-            # Save history to file
-            with open(history_file, "w") as f:
-                json.dump(history.dict(), f, indent=2)
-            logger.info(f"Saved agent history to: {history_file}")
+#             # Save history to file
+#             with open(history_file, "w") as f:
+#                 json.dump(history.dict(), f, indent=2)
+#             logger.info(f"Saved agent history to: {history_file}")
             
-            # Initialize final_update at the start
-            final_update = {
-                chatbot_comp: gr.update(value=webui_manager.bu_chat_history),
-                run_button_comp: gr.update(interactive=True),
-                stop_button_comp: gr.update(interactive=False),
-                pause_resume_button_comp: gr.update(interactive=False),
-                history_file_comp: gr.update(value=history_file),
-            }
+#             # Initialize final_update at the start
+#             final_update = {
+#                 #chatbot_comp: gr.update(value=webui_manager.bu_chat_history),
+#                 run_button_comp: gr.update(interactive=True),
+#                 stop_button_comp: gr.update(interactive=False),
+#                 #pause_resume_button_comp: gr.update(interactive=False),                     #noneed for this button
+#                 history_file_comp: gr.update(value=history_file),
+#             }
             
-            if os.path.exists(gif_path):
-                final_update[gif_comp] = gr.update(value=gif_path, visible=True)
+#             if os.path.exists(gif_path):
+#                 final_update[gif_comp] = gr.update(value=gif_path, visible=True)
                 
-            yield final_update
+#             yield final_update
             
-        except Exception as e:
-            logger.error(f"Error during agent execution: {e}", exc_info=True)
-            error_message = (
-                f"**Agent Execution Error:**\n```\n{type(e).__name__}: {e}\n```"
-            )
-            if not any(
-                    error_message in msg.get("content", "")
-                    for msg in webui_manager.bu_chat_history
-                    if msg.get("role") == "assistant"
-            ):
-                webui_manager.bu_chat_history.append(
-                    {"role": "assistant", "content": error_message}
-                )
-            final_update[chatbot_comp] = gr.update(value=webui_manager.bu_chat_history)
-            yield final_update
-            gr.Error(f"Agent execution failed: {e}")
+#         except Exception as e:
+#             logger.error(f"Error during agent execution: {e}", exc_info=True)
+#             error_message = (
+#                 f"**Agent Execution Error:**\n```\n{type(e).__name__}: {e}\n```"
+#             )
+#             if not any(
+#                     error_message in msg.get("content", "")
+#                     for msg in webui_manager.bu_chat_history
+#                     if msg.get("role") == "assistant"
+#             ):
+#                 webui_manager.bu_chat_history.append(
+#                     {"role": "assistant", "content": error_message}
+#                 )
+#             #final_update[chatbot_comp] = gr.update(value=webui_manager.bu_chat_history)
+#             yield final_update
+#             gr.Error(f"Agent execution failed: {e}")
 
-        finally:
-            # Just clear the current task reference
-            webui_manager.bu_current_task = None
+#         finally:
+#             # Just clear the current task reference
+#             webui_manager.bu_current_task = None
 
-    except Exception as e:
-        # Catch errors during setup (before agent run starts)
-        logger.error(f"Error setting up agent task: {e}", exc_info=True)
-        webui_manager.bu_current_task = None  # Ensure state is reset
+#     except Exception as e:
+#         # Catch errors during setup (before agent run starts)
+#         logger.error(f"Error setting up agent task: {e}", exc_info=True)
+#         webui_manager.bu_current_task = None  # Ensure state is reset
         
-        # Update final_update with error state
-        final_update.update({
-            user_input_comp: gr.update(
-                interactive=True, placeholder="Error during setup. Enter task..."
-            ),
-            run_button_comp: gr.update(value="▶️ Submit Task", interactive=True),
-            stop_button_comp: gr.update(value="⏹️ Stop", interactive=False),
-            pause_resume_button_comp: gr.update(value="⏸️ Pause", interactive=False),
-            clear_button_comp: gr.update(interactive=True),
-            chatbot_comp: gr.update(
-                value=webui_manager.bu_chat_history
-                      + [{"role": "assistant", "content": f"**Setup Error:** {e}"}]
-            ),
-        })
-        yield final_update
+#         # Update final_update with error state
+#         final_update.update({
+#             user_input_comp: gr.update(
+#                 interactive=True, placeholder="Error during setup. Enter task..."
+#             ),
+#             run_button_comp: gr.update(value="▶️ Submit Task", interactive=True),
+#             stop_button_comp: gr.update(value="⏹️ Stop", interactive=False),
+#             #pause_resume_button_comp: gr.update(value="⏸️ Pause", interactive=False),            #no need right now for this button
+#             clear_button_comp: gr.update(interactive=True),
+#             # chatbot_comp: gr.update(
+#             #     value=webui_manager.bu_chat_history
+#             #           + [{"role": "assistant", "content": f"**Setup Error:** {e}"}]
+#             # ),
+#         })
+#         yield final_update
 
 
 # --- Button Click Handlers --- (Need access to webui_manager)
@@ -756,10 +982,14 @@ async def handle_stop(webui_manager: WebuiManager):
         return {
             webui_manager.get_component_by_id(
                 "browser_use_agent.stop_button"
-            ): gr.update(interactive=False, value="⏹️ Stopping..."),
-            webui_manager.get_component_by_id(
-                "browser_use_agent.pause_resume_button"
-            ): gr.update(interactive=False),
+            ): gr.update(interactive=False, value="⏹️ Stopping...")
+            
+            #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+            
+            # ,webui_manager.get_component_by_id(
+            #     "browser_use_agent.pause_resume_button"
+            #): gr.update(interactive=False)
+            ,
             webui_manager.get_component_by_id(
                 "browser_use_agent.run_button"
             ): gr.update(interactive=False),
@@ -774,43 +1004,49 @@ async def handle_stop(webui_manager: WebuiManager):
             webui_manager.get_component_by_id(
                 "browser_use_agent.stop_button"
             ): gr.update(interactive=False),
-            webui_manager.get_component_by_id(
-                "browser_use_agent.pause_resume_button"
-            ): gr.update(interactive=False),
+            
+            #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+            # webui_manager.get_component_by_id(
+            #     "browser_use_agent.pause_resume_button"
+            # ): gr.update(interactive=False),
             webui_manager.get_component_by_id(
                 "browser_use_agent.clear_button"
             ): gr.update(interactive=True),
         }
+    
+
+# Pause/resume functionality not implemented in agent state machine
 
 
-async def handle_pause_resume(webui_manager: WebuiManager):
-    """Handles clicks on the 'Pause/Resume' button."""
-    agent = webui_manager.bu_agent
-    task = webui_manager.bu_current_task
+# async def handle_pause_resume(webui_manager: WebuiManager):
+#     """Handles clicks on the 'Pause/Resume' button."""
+#     agent = webui_manager.bu_agent
+#     task = webui_manager.bu_current_task
 
-    if agent and task and not task.done():
-        if agent.state.paused:
-            logger.info("Resume button clicked.")
-            agent.resume()
-            # UI update happens in main loop
-            return {
-                webui_manager.get_component_by_id(
-                    "browser_use_agent.pause_resume_button"
-                ): gr.update(value="⏸️ Pause", interactive=True)
-            }  # Optimistic update
-        else:
-            logger.info("Pause button clicked.")
-            agent.pause()
-            return {
-                webui_manager.get_component_by_id(
-                    "browser_use_agent.pause_resume_button"
-                ): gr.update(value="▶️ Resume", interactive=True)
-            }  # Optimistic update
-    else:
-        logger.warning(
-            "Pause/Resume clicked but agent is not running or doesn't support state."
-        )
-        return {}  # No change
+#     if agent and task and not task.done():
+#         if agent.state.paused:
+#             logger.info("Resume button clicked.")
+#             agent.resume()
+#             # UI update happens in main loop
+#             return {
+#                 webui_manager.get_component_by_id(
+#                     "browser_use_agent.pause_resume_button"
+#                 ): gr.update(value="⏸️ Pause", interactive=True)
+#             }  # Optimistic update
+#         else:
+#             logger.info("Pause button clicked.")
+#             agent.pause()
+#             return {
+#                 webui_manager.get_component_by_id(
+#                     "browser_use_agent.pause_resume_button"
+#                 ): gr.update(value="▶️ Resume", interactive=True)
+#             }  # Optimistic update
+#     else:
+#         logger.warning(
+#             "Pause/Resume clicked but agent is not running or doesn't support state."
+#         )
+#         return {}  # No change
 
 
 async def handle_clear(webui_manager: WebuiManager):
@@ -868,11 +1104,14 @@ async def handle_clear(webui_manager: WebuiManager):
             value="▶️ Submit Task", interactive=True
         ),
         webui_manager.get_component_by_id("browser_use_agent.stop_button"): gr.update(
-            interactive=False
-        ),
-        webui_manager.get_component_by_id(
-            "browser_use_agent.pause_resume_button"
-        ): gr.update(value="⏸️ Pause", interactive=False),
+            interactive=False),
+
+        #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+        # ,
+        # webui_manager.get_component_by_id(
+        #     "browser_use_agent.pause_resume_button"
+        # ): gr.update(value="⏸️ Pause", interactive=False),
         webui_manager.get_component_by_id("browser_use_agent.clear_button"): gr.update(
             interactive=True
         ),
@@ -917,9 +1156,12 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
             stop_button = gr.Button(
                 "⏹️ Stop", interactive=False, variant="stop", scale=2
             )
-            pause_resume_button = gr.Button(
-                "⏸️ Pause", interactive=False, variant="secondary", scale=2, visible=True
-            )
+
+            #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+            # pause_resume_button = gr.Button(
+            #     "⏸️ Pause", interactive=False, variant="secondary", scale=2, visible=True
+            # )
             clear_button = gr.Button(
                 "🗑️ Clear", interactive=True, variant="secondary", scale=2
             )
@@ -950,7 +1192,10 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
             clear_button=clear_button,
             run_button=run_button,
             stop_button=stop_button,
-            pause_resume_button=pause_resume_button,
+
+            #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+            # pause_resume_button=pause_resume_button,
             agent_history_file=agent_history_file,
             recording_gif=recording_gif,
             browser_view=browser_view,
@@ -977,10 +1222,12 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
         update_dict = await handle_stop(webui_manager)
         yield update_dict
 
-    async def pause_resume_wrapper() -> AsyncGenerator[Dict[Component, Any], None]:
-        """Wrapper for handle_pause_resume."""
-        update_dict = await handle_pause_resume(webui_manager)
-        yield update_dict
+    #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+    # async def pause_resume_wrapper() -> AsyncGenerator[Dict[Component, Any], None]:
+    #     """Wrapper for handle_pause_resume."""
+    #     update_dict = await handle_pause_resume(webui_manager)
+    #     yield update_dict
 
     async def clear_wrapper() -> AsyncGenerator[Dict[Component, Any], None]:
         """Wrapper for handle_clear."""
@@ -995,7 +1242,13 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
         fn=submit_wrapper, inputs=all_managed_components, outputs=run_tab_outputs
     )
     stop_button.click(fn=stop_wrapper, inputs=None, outputs=run_tab_outputs)
-    pause_resume_button.click(
-        fn=pause_resume_wrapper, inputs=None, outputs=run_tab_outputs
-    )
+    
     clear_button.click(fn=clear_wrapper, inputs=None, outputs=run_tab_outputs)
+
+    #Pause/resume functionality is currently disabled and not handled in the agent workflow.
+
+    # pause_resume_button.click(
+    #     fn=pause_resume_wrapper, inputs=None, outputs=run_tab_outputs
+    # )
+
+

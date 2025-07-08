@@ -1,0 +1,229 @@
+<link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Next SQA AI</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #f9f9f9;
+      padding: 40px;
+      color: #333;
+      max-width: 800px;
+      margin: auto;
+    }
+
+    h2 {
+      text-align: center;
+      color: #333;
+      margin-bottom: 30px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      font-weight: 500;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 15px;
+      background-color: #fff;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 10px;
+    }
+
+    button {
+      background-color: #007bff;
+      color: white;
+      padding: 10px 18px;
+      font-size: 15px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    button:disabled {
+      background-color: #6c757d;
+      cursor: not-allowed;
+    }
+
+    #video-container {
+      margin-top: 40px;
+      text-align: center;
+    }
+
+    video {
+      width: 100%;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    #error-message {
+      color: red;
+      text-align: center;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+<meta http-equiv="Cache-Control" content="no-store" />
+
+<body>
+  <h2>🧪 Website Testing Agent</h2>
+
+  <div class="form-group">
+    <label for="query">Prompt:</label>
+    <input type="text" id="query" placeholder="e.g. Test the login button" />
+  </div>
+
+  <div class="form-group">
+    <label for="url">Website URL:</label>
+    <input type="text" id="url" placeholder="e.g. https://example.com" />
+  </div>
+
+  <div class="buttons">
+    <button onclick="submitTest()">Submit</button>
+    <button onclick="clearForm()">Clear</button>
+    <button onclick="stopTest()">Stop</button>
+  </div>
+
+  <div id="error-message"></div>
+
+  <div id="video-container">
+    <h3>Test Video:</h3>
+    <div style="margin-top: 15px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 10px; padding: 10px; display: flex; justify-content: center; align-items: center; min-height: 300px;">
+      <video id="test-video" controls hidden style="width: 100%; max-width: 700px; height: 280px; border-radius: 10px;">
+        <source id="video-source" src="" type="video/webm" />
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  </div>
+
+  <script>
+    async function submitTest() {
+      const queryInput = document.getElementById("query");
+      const urlInput = document.getElementById("url");
+      const errorDiv = document.getElementById("error-message");
+      const submitBtn = document.querySelector(".buttons button"); // Submit button
+      const video = document.getElementById("test-video");
+      const source = document.getElementById("video-source");
+
+      const query = queryInput.value.trim();
+      const url = urlInput.value.trim();
+
+      errorDiv.textContent = "";
+
+      if (!query || !url) {
+        errorDiv.textContent = "Both fields are required.";
+        return;
+      }
+
+      // 🔒 Disable input fields and button
+      queryInput.disabled = true;
+      urlInput.disabled = true;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Running...";
+      submitBtn.style.backgroundColor = "#6c757d";
+
+      // Reset video and message
+      source.src = "";
+      video.load();
+      video.hidden = true;
+      document.querySelector("#video-container h3").textContent = "Test Video:";
+
+      try {
+        const response = await fetch("/run-agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, url }),
+        });
+
+        const result = await response.json();
+        console.log("Agent result:", result);
+
+        if (response.ok) {
+          if (result.videos && result.videos.length > 0) {
+            const videoFilename = result.videos[0];
+            const videoPath = `/videos/${videoFilename}?t=${Date.now()}&r=${Math.random()}`;
+
+            console.log("Loading video:", videoPath);
+            
+            source.src = videoPath;
+            video.load();
+            video.hidden = false;
+
+            video.hidden = false;
+            document.querySelector("#video-container h3").textContent = "Test Video:";
+          } else {
+            errorDiv.textContent = "No video was recorded for this task.";
+            document.querySelector("#video-container h3").textContent = "No test performed.";
+          }
+        } else {
+          errorDiv.textContent = "Error: " + (result.detail || "Unknown error");
+        }
+      } catch (err) {
+        errorDiv.textContent = "Something went wrong. Please try again.";
+        console.error("Fetch error:", err);
+      }
+
+      // ✅ Restore button but keep inputs disabled
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Submit";
+      submitBtn.style.backgroundColor = "#007bff";
+    }
+
+    function clearForm() {
+      const queryInput = document.getElementById("query");
+      const urlInput = document.getElementById("url");
+      const video = document.getElementById("test-video");
+      const source = document.getElementById("video-source");
+
+      queryInput.value = "";
+      urlInput.value = "";
+      queryInput.disabled = false;
+      urlInput.disabled = false;
+
+      video.hidden = true;
+      source.src = "";
+      video.load();
+
+      document.getElementById("error-message").textContent = "";
+      document.querySelector("#video-container h3").textContent = "Test Video:";
+    }
+
+    function stopTest() {
+      fetch("/stop-agent", { method: "POST" })
+        .then(res => res.json())
+        .then(data => {
+          alert(data.status || "Stopped.");
+        })
+        .catch(err => {
+          console.error("Failed to stop:", err);
+          alert("Failed to stop the agent.");
+        });
+    }
+  </script>
+</body>
+</html>

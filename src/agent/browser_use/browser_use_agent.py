@@ -128,6 +128,7 @@ class BrowserUseAgent(Agent):
                 )
 
                 logger.info(f'❌ {error_message}')
+                
 
             return self.state.history
 

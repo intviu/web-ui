@@ -14,6 +14,9 @@ import asyncio
 from playwright.async_api import async_playwright
 from openai import OpenAI
 
+
+
+
 logger = logging.getLogger(__name__)
 
 class State(TypedDict):
@@ -316,11 +319,11 @@ class AgentOrchestrator:
                     "check": final_state.get("webpage_check", False),
                     "message": final_state.get("webpage_msg", "")
                 },
-                # "snippet_extraction": {
-                #     "check": final_state.get("snippet_check", False),
-                #     "message": final_state.get("extracted_snippet_agent_msg", ""),
-                #     "snippet": final_state.get("extracted_snippet", "")
-                # },
+                "snippet_extraction": {
+                    "check": False,
+                    "message": "",
+                    "snippet": ""
+                },
                 "qa_possibility": {
                     "check": final_state.get("QA_possibility_check", False),
                     "message": final_state.get("QA_possibility_agent_msg", "")
@@ -329,11 +332,11 @@ class AgentOrchestrator:
                     "prompt": final_state.get("enhanced_prompt", ""),
                     "message": final_state.get("enhanced_prompt_agent_msg", "")
                 },
-                # "evaluation_previous_goal": "Previous goal completed successfully",
-                # "memory": "Task completed successfully",
-                # "next_goal": "Task completed"
+                "evaluation_previous_goal": "Previous goal completed successfully",
+                "memory": "Task completed successfully",
+                "next_goal": "Task completed"
             }
-            
+               
             return AgentHistoryList(
                 history=[
                     {
@@ -341,9 +344,15 @@ class AgentOrchestrator:
                             "current_state": current_state,
                             "action": []  # Empty list for actions
                         },
+                        # "result": [{
+                        #     "type": "success",
+                        #     "message": final_state.get("browser_result", "Task completed successfully")
+                        # }],
                         "result": [{
-                            "type": "success",
-                            "message": final_state.get("browser_result", "Task completed successfully")
+                            "is_done": True,
+                            "success": True,
+                            "extracted_content": str(final_state.get("browser_result", "Task completed successfully"))
+
                         }],
                         "state": {
                             "title": "",
