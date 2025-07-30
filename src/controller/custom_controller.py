@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 
 Context = TypeVar('Context')
 
+class SearchBingAction(BaseModel):
+    query: str
+
 
 class CustomController(Controller):
     def __init__(self, exclude_actions: list[str] = [],
@@ -105,6 +108,33 @@ class CustomController(Controller):
                 msg = f'Failed to upload file to index {index}: {str(e)}'
                 logger.info(msg)
                 return ActionResult(error=msg)
+
+
+
+
+        @self.registry.action(
+            'Search the query in Bing search engine. Use this action for all web searches instead of navigating to Google. The query should be concrete and not vague or super long.',
+            param_model=SearchBingAction,
+        )
+        async def search_bing(params: SearchBingAction, browser: BrowserContext):
+            """使用必应搜索引擎进行搜索"""
+            try:
+                query = params.query
+                encoded_query = query.replace(" ", "+")
+                search_url = f"https://cn.bing.com/search?q={encoded_query}"
+                
+                # 导航到搜索页面
+                page = await browser.get_current_page()
+                await page.goto(search_url)
+                await page.wait_for_load_state()
+                
+                msg = f'🔍  Searched for "{query}" in Bing'
+                logger.info(msg)
+                return ActionResult(extracted_content=msg, include_in_memory=True)
+                
+            except Exception as e:
+                logger.error(f"Bing search failed: {e}")
+                return ActionResult(error=f"Bing search failed: {str(e)}")
 
     @time_execution_sync('--act')
     async def act(

@@ -7,6 +7,8 @@ from typing import Any, AsyncGenerator, Dict, Optional
 
 import gradio as gr
 
+from src.utils.log_handler import setup_ui_logging, get_ui_logs, clear_ui_logs
+
 # from browser_use.agent.service import Agent
 from browser_use.agent.views import (
     AgentHistoryList,
@@ -428,7 +430,8 @@ async def run_agent_task(
 
     if not webui_manager.bu_controller:
         webui_manager.bu_controller = CustomController(
-            ask_assistant_callback=ask_callback_wrapper
+            ask_assistant_callback=ask_callback_wrapper,
+            exclude_actions=["search_google"]
         )
         await webui_manager.bu_controller.setup_mcp_client(mcp_server_config)
 
@@ -683,6 +686,33 @@ async def run_agent_task(
                     )
             else:
                 update_dict[browser_view_comp] = gr.update(visible=False)
+            
+            # Update Log Display (every few iterations to avoid too frequent updates)
+            log_display_comp = webui_manager.get_component_by_id("browser_use_agent.log_display")
+            if log_display_comp:
+                logs = get_ui_logs(limit=300)  # 显示最近300行日志
+                if logs:
+                    # 将日志转换为HTML格式
+                    log_lines = logs.split('\n')
+                    html_logs = []
+                    for line in log_lines:
+                        if line.strip():
+                            # 根据日志级别添加颜色
+                            if 'ERROR' in line:
+                                color = '#dc3545'  # 红色
+                            elif 'WARNING' in line:
+                                color = '#ffc107'  # 黄色
+                            elif 'INFO' in line:
+                                color = '#17a2b8'  # 蓝色
+                            else:
+                                color = '#6c757d'  # 灰色
+                            html_logs.append(f'<div style="color:{color}; margin:1px 0;">{line}</div>')
+                    
+                    html_content = f'<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;">{"".join(html_logs)}</div>'
+                else:
+                    html_content = '<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;"><p style="margin:0; color:#6c757d;">No logs available...</p></div>'
+                
+                update_dict[log_display_comp] = gr.update(value=html_content)
 
             # Yield accumulated updates
             if update_dict:
@@ -792,6 +822,45 @@ async def run_agent_task(
             ),
         }
 
+
+# --- Log Handling Functions ---
+
+async def handle_clear_logs(webui_manager: WebuiManager):
+    """清空日志"""
+    clear_ui_logs()
+    return {
+        webui_manager.get_component_by_id("browser_use_agent.log_display"): gr.update(
+            value="<div style='background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;'><p style='margin:0; color:#6c757d;'>Logs cleared...</p></div>"
+        )
+    }
+
+async def handle_refresh_logs(webui_manager: WebuiManager):
+    """刷新日志显示"""
+    logs = get_ui_logs(limit=500)  # 限制显示最近500行
+    if logs:
+        # 将日志转换为HTML格式
+        log_lines = logs.split('\n')
+        html_logs = []
+        for line in log_lines:
+            if line.strip():
+                # 根据日志级别添加颜色
+                if 'ERROR' in line:
+                    color = '#dc3545'  # 红色
+                elif 'WARNING' in line:
+                    color = '#ffc107'  # 黄色
+                elif 'INFO' in line:
+                    color = '#17a2b8'  # 蓝色
+                else:
+                    color = '#6c757d'  # 灰色
+                html_logs.append(f'<div style="color:{color}; margin:1px 0;">{line}</div>')
+        
+        html_content = f'<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;">{"".join(html_logs)}</div>'
+    else:
+        html_content = '<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;"><p style="margin:0; color:#6c757d;">No logs available...</p></div>'
+    
+    return {
+        webui_manager.get_component_by_id("browser_use_agent.log_display"): gr.update(value=html_content)
+    }
 
 # --- Button Click Handlers --- (Need access to webui_manager)
 
@@ -1014,6 +1083,29 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
             elem_id="browser_view",
             visible=False,
         )
+        
+        # 添加日志显示区域
+        with gr.Column():
+            gr.Markdown("### Application Logs")
+            log_display = gr.HTML(
+                value="<div style='background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;'><p style='margin:0; color:#6c757d;'>Logs will appear here...</p></div>",
+                label="Real-time Logs",
+                elem_id="log_display",
+            )
+            with gr.Row():
+                clear_logs_button = gr.Button(
+                    "🗑️ Clear Logs", 
+                    variant="secondary", 
+                    scale=1,
+                    elem_id="clear_logs_button"
+                )
+                refresh_logs_button = gr.Button(
+                    "🔄 Refresh Logs", 
+                    variant="secondary", 
+                    scale=1,
+                    elem_id="refresh_logs_button"
+                )
+        
         with gr.Column():
             gr.Markdown("### Task Outputs")
             agent_history_file = gr.File(label="Agent History JSON", interactive=False)
@@ -1033,6 +1125,9 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
             run_button=run_button,
             stop_button=stop_button,
             pause_resume_button=pause_resume_button,
+            log_display=log_display,
+            clear_logs_button=clear_logs_button,
+            refresh_logs_button=refresh_logs_button,
             agent_history_file=agent_history_file,
             recording_gif=recording_gif,
             browser_view=browser_view,
@@ -1069,6 +1164,16 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
         update_dict = await handle_clear(webui_manager)
         yield update_dict
 
+    async def clear_logs_wrapper() -> AsyncGenerator[Dict[Component, Any], None]:
+        """Wrapper for handle_clear_logs."""
+        update_dict = await handle_clear_logs(webui_manager)
+        yield update_dict
+
+    async def refresh_logs_wrapper() -> AsyncGenerator[Dict[Component, Any], None]:
+        """Wrapper for handle_refresh_logs."""
+        update_dict = await handle_refresh_logs(webui_manager)
+        yield update_dict
+
     # --- Connect Event Handlers using the Wrappers --
     run_button.click(
         fn=submit_wrapper, inputs=all_managed_components, outputs=run_tab_outputs
@@ -1081,3 +1186,5 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
         fn=pause_resume_wrapper, inputs=None, outputs=run_tab_outputs
     )
     clear_button.click(fn=clear_wrapper, inputs=None, outputs=run_tab_outputs)
+    clear_logs_button.click(fn=clear_logs_wrapper, inputs=None, outputs=run_tab_outputs)
+    refresh_logs_button.click(fn=refresh_logs_wrapper, inputs=None, outputs=run_tab_outputs)

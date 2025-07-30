@@ -17,6 +17,7 @@ from src.browser.custom_browser import CustomBrowser
 from src.browser.custom_context import CustomBrowserContext
 from src.controller.custom_controller import CustomController
 from src.agent.deep_research.deep_research_agent import DeepResearchAgent
+from src.utils.log_handler import setup_ui_logging
 
 
 class WebuiManager:
@@ -26,6 +27,9 @@ class WebuiManager:
 
         self.settings_save_dir = settings_save_dir
         os.makedirs(self.settings_save_dir, exist_ok=True)
+        
+        # 设置UI日志记录
+        setup_ui_logging()
 
     def init_browser_use_agent(self) -> None:
         """
