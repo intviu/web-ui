@@ -249,7 +249,7 @@ def get_llm_model(provider: str, **kwargs):
         else:
             base_url = kwargs.get("base_url")
 
-        if "deepseek-r1" in kwargs.get("model_name", "qwen2.5:7b"):
+        if "deepseek-r1" in kwargs.get("model_name", "qwen2.5vl:latest"):
             return DeepSeekR1ChatOllama(
                 model=kwargs.get("model_name", "deepseek-r1:14b"),
                 temperature=kwargs.get("temperature", 0.0),
@@ -258,7 +258,7 @@ def get_llm_model(provider: str, **kwargs):
             )
         else:
             return ChatOllama(
-                model=kwargs.get("model_name", "qwen2.5:7b"),
+                model=kwargs.get("model_name", "qwen2.5vl:latest"),
                 temperature=kwargs.get("temperature", 0.0),
                 num_ctx=kwargs.get("num_ctx", 32000),
                 num_predict=kwargs.get("num_predict", 1024),

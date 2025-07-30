@@ -93,6 +93,13 @@ async def run_single_browser_task(
             browser_binary_path = None
 
         bu_browser = CustomBrowser(
+            # 这些参数的含义如下：
+            # headless: 是否以无头模式启动浏览器（即不显示界面，适合自动化任务）。
+            # browser_binary_path: 浏览器可执行文件的路径（如果需要自定义浏览器版本）。
+            # extra_browser_args: 启动浏览器时附加的命令行参数列表。
+            # wss_url: 远程 WebSocket 调试地址（用于连接已存在的浏览器实例）。
+            # cdp_url: Chrome DevTools Protocol 的调试地址（另一种远程调试方式）。
+            # new_context_config: 新建浏览器上下文的配置（如窗口宽高等）。
             config=BrowserConfig(
                 headless=headless,
                 browser_binary_path=browser_binary_path,
@@ -276,7 +283,8 @@ def create_browser_search_tool(
         max_parallel_browsers: int = 1,
 ) -> StructuredTool:
     """Factory function to create the browser search tool with necessary dependencies."""
-    # Use partial to bind the dependencies that aren't part of the LLM call arguments
+    # partial 是 Python functools 模块中的一个函数，用于“预先绑定”部分参数，返回一个新的可调用对象。
+    # 这样可以把一些参数提前固定住，后续调用时只需传递剩余参数即可，常用于回调、工具函数等场景。
     from functools import partial
 
     bound_tool_func = partial(
@@ -1014,6 +1022,8 @@ class DeepResearchAgent:
             ReadFileTool(),
             ListDirectoryTool(),
         ]  # Basic file operations
+        print(self.browser_config)
+        print(f'stop_event:{stop_event}')
         browser_use_tool = create_browser_search_tool(
             llm=self.llm,
             browser_config=self.browser_config,
