@@ -60,8 +60,32 @@ def setup_ui_logging():
     root_logger = logging.getLogger()
     root_logger.addHandler(ui_log_handler)
     
-    # 设置日志级别
+    # 设置根logger的级别
     root_logger.setLevel(logging.INFO)
+    
+    # 确保所有logger都传播到根logger
+    # 这是关键：强制所有logger使用根logger的处理器
+    for name in logging.root.manager.loggerDict:
+        logger = logging.getLogger(name)
+        logger.handlers = []  # 清除所有现有处理器
+        logger.propagate = True  # 确保传播到根logger
+        logger.setLevel(logging.INFO)
+    
+    # 特别处理browser_use相关的logger
+    browser_use_loggers = [
+        'browser_use',
+        'browser_use.agent',
+        'browser_use.agent.service',
+        'browser_use.controller',
+        'browser_use.browser',
+        'agent'
+    ]
+    
+    for logger_name in browser_use_loggers:
+        logger = logging.getLogger(logger_name)
+        logger.handlers = []  # 清除现有处理器
+        logger.propagate = True  # 确保传播
+        logger.setLevel(logging.INFO)
     
     return ui_log_handler
 

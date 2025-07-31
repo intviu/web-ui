@@ -18,6 +18,7 @@ from src.browser.custom_context import CustomBrowserContext
 from src.controller.custom_controller import CustomController
 from src.agent.deep_research.deep_research_agent import DeepResearchAgent
 from src.utils.log_handler import setup_ui_logging
+from src.utils.gif_font_patch import apply_gif_font_patch
 
 
 class WebuiManager:
@@ -30,6 +31,9 @@ class WebuiManager:
         
         # 设置UI日志记录
         setup_ui_logging()
+        
+        # 应用GIF字体补丁
+        apply_gif_font_patch()
 
     def init_browser_use_agent(self) -> None:
         """
