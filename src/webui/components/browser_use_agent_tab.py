@@ -464,6 +464,17 @@ async def run_agent_task(
             else:
                 browser_binary_path = None
 
+            # 配置代理
+            proxy_config = None
+            if os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY'):
+                proxy_url = os.environ.get('http_proxy') or os.environ.get('HTTP_PROXY')
+                from browser_use.browser.browser import ProxySettings
+                proxy_config = ProxySettings(
+                    server=proxy_url,
+                    bypass="127.0.0.1,localhost,192.168.1.0/24"
+                )
+                logger.info(f"配置浏览器代理: {proxy_url}")
+            
             webui_manager.bu_browser = CustomBrowser(
                 config=BrowserConfig(
                     headless=headless,
@@ -472,6 +483,7 @@ async def run_agent_task(
                     extra_browser_args=extra_args,
                     wss_url=wss_url,
                     cdp_url=cdp_url,
+                    proxy=proxy_config,
                     new_context_config=BrowserContextConfig(
                         window_width=window_w,
                         window_height=window_h,
