@@ -7,7 +7,7 @@ from collections import deque
 class UILogHandler(logging.Handler):
     """自定义日志处理器，将日志存储到内存中供UI显示"""
     
-    def __init__(self, max_logs: int = 1000):
+    def __init__(self, max_logs: int = 5000):
         super().__init__()
         self.max_logs = max_logs
         # 使用deque，它是线程安全的，并且有maxlen参数自动限制大小
