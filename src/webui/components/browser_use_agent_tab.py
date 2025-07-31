@@ -707,24 +707,12 @@ async def run_agent_task(
                     # 将日志转换为HTML格式
                     log_lines = logs.split('\n')
                     html_logs = []
-                    for line in log_lines:
-                        if line.strip():
-                            # 根据日志级别添加颜色
-                            if 'ERROR' in line:
-                                color = '#dc3545'  # 红色
-                            elif 'WARNING' in line:
-                                color = '#ffc107'  # 黄色
-                            elif 'INFO' in line:
-                                color = '#17a2b8'  # 蓝色
-                            else:
-                                color = '#6c757d'  # 灰色
-                            html_logs.append(f'<div style="color:{color}; margin:1px 0;">{line}</div>')
-                    
-                    html_content = f'<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;">{"".join(html_logs)}</div>'
+                    # 直接使用日志文本，不需要HTML格式化
+                    log_content = logs
                 else:
-                    html_content = '<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;"><p style="margin:0; color:#6c757d;">No logs available...</p></div>'
+                    log_content = "No logs available..."
                 
-                update_dict[log_display_comp] = gr.update(value=html_content)
+                update_dict[log_display_comp] = gr.update(value=log_content)
 
             # Yield accumulated updates
             if update_dict:
@@ -842,7 +830,7 @@ async def handle_clear_logs(webui_manager: WebuiManager):
     clear_ui_logs()
     return {
         webui_manager.get_component_by_id("browser_use_agent.log_display"): gr.update(
-            value="<div style='background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;'><p style='margin:0; color:#6c757d;'>Logs cleared...</p></div>"
+            value="Logs cleared..."
         )
     }
 
@@ -850,28 +838,13 @@ async def handle_refresh_logs(webui_manager: WebuiManager):
     """刷新日志显示"""
     logs = get_ui_logs(limit=500)  # 限制显示最近500行
     if logs:
-        # 将日志转换为HTML格式
-        log_lines = logs.split('\n')
-        html_logs = []
-        for line in log_lines:
-            if line.strip():
-                # 根据日志级别添加颜色
-                if 'ERROR' in line:
-                    color = '#dc3545'  # 红色
-                elif 'WARNING' in line:
-                    color = '#ffc107'  # 黄色
-                elif 'INFO' in line:
-                    color = '#17a2b8'  # 蓝色
-                else:
-                    color = '#6c757d'  # 灰色
-                html_logs.append(f'<div style="color:{color}; margin:1px 0;">{line}</div>')
-        
-        html_content = f'<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;">{"".join(html_logs)}</div>'
+        # 直接返回日志文本，不需要HTML格式化
+        log_content = logs
     else:
-        html_content = '<div style="background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;"><p style="margin:0; color:#6c757d;">No logs available...</p></div>'
+        log_content = "No logs available..."
     
     return {
-        webui_manager.get_component_by_id("browser_use_agent.log_display"): gr.update(value=html_content)
+        webui_manager.get_component_by_id("browser_use_agent.log_display"): gr.update(value=log_content)
     }
 
 # --- Button Click Handlers --- (Need access to webui_manager)
@@ -1099,10 +1072,13 @@ def create_browser_use_agent_tab(webui_manager: WebuiManager):
         # 添加日志显示区域
         with gr.Column():
             gr.Markdown("### Application Logs")
-            log_display = gr.HTML(
-                value="<div style='background-color:#f8f9fa; border:1px solid #dee2e6; border-radius:4px; padding:10px; height:300px; overflow-y:auto; font-family:monospace; font-size:12px;'><p style='margin:0; color:#6c757d;'>Logs will appear here...</p></div>",
+            log_display = gr.Code(
+                value="Logs will appear here...",
+                language="python",
                 label="Real-time Logs",
                 elem_id="log_display",
+                lines=15,
+                interactive=False,
             )
             with gr.Row():
                 clear_logs_button = gr.Button(
